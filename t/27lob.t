@@ -1,14 +1,20 @@
-#!perl -w -I./t
-
-use DBI qw(:sql_types);
-use ADOTEST;
-use strict;
-use Data::Dumper;
-
-
-#
+#!perl -I./t
 
 $| = 1;
+
+use strict;
+use warnings;
+use DBI qw(:sql_types);
+use ADOTEST();
+
+#use Test::More;
+#
+#if (defined $ENV{DBI_DSN}) {
+#  plan tests => ;
+#} else {
+#  plan skip_all => 'Cannot test without DB info';
+#}
+
 my $t = 0;
 my $failed = 0;
 my $table = "perl_dbd_ado_long";
@@ -96,7 +102,7 @@ warn "long_data1 is < 64KB: $len_data1\n"
 	if $len_data1 < 65535;
 warn "long_data2 is not smaller than $long_data1 ($len_data2 > $len_data1)\n"
 	if $len_data2 >= $len_data1;
- 
+
 
 if (!ADOTEST::tab_long_create($dbh, "midx", $tn, SQL_NUMERIC(), "lng", $type_name, $type_num)) {
     warn "Unable to create test table for '$type_name' data ($DBI::err). Tests skipped.\n";
@@ -104,14 +110,9 @@ if (!ADOTEST::tab_long_create($dbh, "midx", $tn, SQL_NUMERIC(), "lng", $type_nam
     return;
 }
 # Determine if an escape sequence is usable.
-my @row;
-foreach (DBI::SQL_DATE(), SQL_TIMESTAMP()) {
-	@row = $dbh->type_info($_);
-	last if @row;
-}
-my $r = shift @row;
-my $pf = $r->{LITERAL_PREFIX};
-my $sf = $r->{LITERAL_SUFFIX};
+my $ti = ADOTEST::get_type_for_column( $dbh,'D');
+my $pf = $ti->{LITERAL_PREFIX};
+my $sf = $ti->{LITERAL_SUFFIX};
 $pf = qq/{d \'/ unless $pf; #'
 $sf = qq/\' }/  unless $sf; #'
 
@@ -137,7 +138,7 @@ $sth->bind_param(2, $long_data2, { TYPE => $type_num } ) or die $DBI::errstr;
 ok( $sth->execute(42, $long_data2), "Inserted data" );
 
 
-print " --- fetch $type_name data back again -- truncated - LongTruncOk == 1\n";#  
+print " --- fetch $type_name data back again -- truncated - LongTruncOk == 1\n";#
 $dbh->{LongReadLen} = 20;
 $dbh->{LongTruncOk} =  1;
 print "LongReadLen $dbh->{LongReadLen}, LongTruncOk $dbh->{LongTruncOk}\n";
@@ -158,7 +159,7 @@ is( $tmp->[2][1], substr($long_data2,0,$out_len),
 
 
 print " --- fetch $type_name data back again -- truncated - LongTruncOk == 0\n";
-$dbh->{LongReadLen} = $len_data1 - 10; 
+$dbh->{LongReadLen} = $len_data1 - 10;
 # so $long_data0 fits but long_data1 doesn't '
 $dbh->{LongReadLen} = $dbh->{LongReadLen} / 2 if $type_name =~ /RAW/i;
 $dbh->{LongTruncOk} = 0;
@@ -308,23 +309,3 @@ sub cdif {
     }
     return "(cdif error $l1/$l2/$i)";
 }
-
-
-# sub ok ($$;$) {
-#     my($n, $ok, $warn) = @_;
-#     $warn ||= '';
-#     ++$t;
-#     die "sequence error, expected $n but actually $t"
-#     if $n and $n != $t;
-#     if ($ok) {
-# 	print "ok $t\n";
-#     }
-#     else {
-# 	$warn = $DBI::errstr || "(DBI::errstr undefined)" if $warn eq '1';
-# 	warn "# failed test $t at line ".(caller)[2].". $warn\n";
-# 	print "not ok $t\n";
-# 	++$failed;
-#     }
-# }
-
-__END__

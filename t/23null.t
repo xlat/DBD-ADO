@@ -27,9 +27,8 @@ my @col = sort keys %ADOTEST::TestFieldInfo;
 
 ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
-for ( @col ) {
-  ok( $dbh->do("INSERT INTO $tbl( $_ ) VALUES( ? )", undef, undef ),"Inserting NULL into $_");
-}
+ok( $dbh->do("INSERT INTO $tbl( $_ ) VALUES( ? )", undef, undef ),"Inserting NULL into $_")
+  for @col;
 
 my $Cols = join ', ', @col;
 my $Qs   = join ', ', map {'?'} @col;
@@ -38,8 +37,8 @@ ok( defined $sth,'Prepare insert statement');
 
 my $i = 0;
 for ( @col ) {
-  my @row = ADOTEST::get_type_for_column( $dbh, $_ );
-  ok( $sth->bind_param( ++$i, undef, { TYPE => $row[0]->{DATA_TYPE} } ),"Bind parameter for column $_");
+  my $ti = ADOTEST::get_type_for_column( $dbh, $_ );
+  ok( $sth->bind_param( ++$i, undef, { TYPE => $ti->{DATA_TYPE} } ),"Bind parameter for column $_");
 }
 ok( $sth->execute,'Execute prepared statement with bind params');
 

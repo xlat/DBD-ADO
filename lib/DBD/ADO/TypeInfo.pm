@@ -6,7 +6,29 @@ use warnings;
 use DBI();
 use DBD::ADO::Const();
 
-$DBD::ADO::TypeInfo::VERSION = '2.80';
+$DBD::ADO::TypeInfo::VERSION = '2.81';
+
+$DBD::ADO::TypeInfo::Fields = {
+  TYPE_NAME          =>  0
+, DATA_TYPE          =>  1
+, COLUMN_SIZE        =>  2
+, LITERAL_PREFIX     =>  3
+, LITERAL_SUFFIX     =>  4
+, CREATE_PARAMS      =>  5
+, NULLABLE           =>  6
+, CASE_SENSITIVE     =>  7
+, SEARCHABLE         =>  8
+, UNSIGNED_ATTRIBUTE =>  9
+, FIXED_PREC_SCALE   => 10
+, AUTO_UNIQUE_VALUE  => 11
+, LOCAL_TYPE_NAME    => 12
+, MINIMUM_SCALE      => 13
+, MAXIMUM_SCALE      => 14
+, SQL_DATA_TYPE      => 15
+, SQL_DATETIME_SUB   => 16
+# NUM_PREC_RADIX     => 17
+# INTERVAL_PRECISION => 18
+};
 
 my $Enums = DBD::ADO::Const->Enums;
 my $Dt = $Enums->{DataTypeEnum};
@@ -196,7 +218,7 @@ Steffen Goeldner (sgoeldner@cpan.org)
 
 =head1 COPYRIGHT
 
-Copyright (c) 2002-2003 Steffen Goeldner. All rights reserved.
+Copyright (c) 2002-2004 Steffen Goeldner. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 

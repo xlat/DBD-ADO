@@ -1,3 +1,10 @@
+2004-02-15  2.89
+
+  Added an alternative implementation for type_info_all(), which is
+  enabled if $dbh->{ado_ti_ver} == 2.
+
+  !!! The next release of DBD::ADO may default to this new version. !!!
+
 2004-02-08  2.88
 
   Removed $dbh->{ado_provider_auto_commit_comments} and renamed

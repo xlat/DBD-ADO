@@ -19,19 +19,14 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 ok ( defined $dbh,'Connection');
 
 
-my $sth;
+my $tia = $dbh->type_info_all;
+is( ref $tia,'ARRAY','type_info_all');
 
-eval {
-  $sth = $dbh->type_info_all;
-};
-ok ( ( !$@ and defined $sth ),'type_info_all tested');
-$sth = undef;
-
-eval {
-  my @types = $dbh->type_info;
-  die unless @types;
-};
-ok ( !$@,'type_info( undef )');
-$sth = undef;
+my @ti = $dbh->type_info;
+ok( @ti,'type_info');
+for my $ti ( @ti ) {
+  print  "#\n";
+  printf "# %-20s => %s\n", $_, DBI::neat( $ti->{$_} ) for sort keys %$ti;
+}
 
 ok( $dbh->disconnect,'Disconnect');

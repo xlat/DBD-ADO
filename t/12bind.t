@@ -1,5 +1,4 @@
 #!perl -I./t
-# vim:ts=2:sw=2:ai:aw:nu
 
 $| = 1;
 
@@ -44,14 +43,14 @@ sub tab_select
 
   my $sth = $dbh->prepare("SELECT A,B,C,D FROM $ADOTEST::table_name WHERE a = ?")
     or return undef;
-  my @type = ADOTEST::get_type_for_column( $dbh, 'A');
+  my $ti = ADOTEST::get_type_for_column( $dbh,'A');
   for my $v ( 1, 3, 2, 4, 10 ) {
-    $sth->bind_param( 1, $v, { TYPE => $type[0]->{DATA_TYPE} } );
+    $sth->bind_param( 1, $v, { TYPE => $ti->{DATA_TYPE} } );
     $sth->execute;
     while ( my $row = $sth->fetch ) {
-      print "-- $row->[0] length:", length $row->[1]," $row->[1] $row->[2] $row->[3]\n";
+      print "# -- $row->[0] length:", length $row->[1]," $row->[1] $row->[2] $row->[3]\n";
       if ( $row->[0] != $v ) {
-        print "Bind value failed! bind value = $v, returned value = $row->[0]\n";
+        print "# Bind value failed! bind value = $v, returned value = $row->[0]\n";
         return undef;
       }
     }
@@ -71,21 +70,21 @@ sub tab_insert
   }
   $sth->{PrintError} = 1;
   for ( @$data ) {
-    my @row;
+    my $ti;
 
-    @row = ADOTEST::get_type_for_column( $dbh, 'A');
-    $sth->bind_param( 1, $_->[ 0], { TYPE => $row[0]->{DATA_TYPE} } );
+    $ti = ADOTEST::get_type_for_column( $dbh,'A');
+    $sth->bind_param( 1, $_->[ 0], { TYPE => $ti->{DATA_TYPE} } );
 
-    @row = ADOTEST::get_type_for_column( $dbh, 'B');
-    $_->[1] = $_->[1] x (int( int( $row[0]->{COLUMN_SIZE} / 2 ) / length( $_->[1] ) ) );  # XXX
-    $sth->bind_param( 2, $_->[ 1], { TYPE => $row[0]->{DATA_TYPE} } );
+    $ti = ADOTEST::get_type_for_column( $dbh,'B');
+    $_->[1] = $_->[1] x (int( int( $ti->{COLUMN_SIZE} / 2 ) / length( $_->[1] ) ) );  # XXX
+    $sth->bind_param( 2, $_->[ 1], { TYPE => $ti->{DATA_TYPE} } );
 
-    @row = ADOTEST::get_type_for_column( $dbh, 'C');
-    $sth->bind_param( 3, $_->[ 2], { TYPE => $row[0]->{DATA_TYPE} } );
+    $ti = ADOTEST::get_type_for_column( $dbh,'C');
+    $sth->bind_param( 3, $_->[ 2], { TYPE => $ti->{DATA_TYPE} } );
 
-    @row = ADOTEST::get_type_for_column( $dbh, 'D');
-    my $i = ( $row[0]->{DATA_TYPE} == DBI::SQL_DATE ) ? 3 : 4;
-    $sth->bind_param( 4, $_->[$i], { TYPE => $row[0]->{DATA_TYPE} } );
+    $ti = ADOTEST::get_type_for_column( $dbh,'D');
+    my $i = ( $ti->{DATA_TYPE} == DBI::SQL_TYPE_DATE || $ti->{DATA_TYPE} == DBI::SQL_DATE ) ? 3 : 4;
+    $sth->bind_param( 4, $_->[$i], { TYPE => $ti->{DATA_TYPE} } );
 
     return 0 unless $sth->execute;
   }

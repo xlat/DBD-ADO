@@ -59,8 +59,7 @@ my $tbl = $ADOTEST::table_name;
     is( $row->[ 2], $tbl             ,"Is this table name $tbl?");
     is( $row->[16], $i               ,"Is this ordinal position $i?");
     is( $row->[ 3], $ColNames[$i-1]  ,"Is this column name $ColNames[$i-1]?");
-    my @ti = ADOTEST::get_type_for_column( $dbh, $row->[3] );
-    my $ti = shift @ti;
+    my $ti = ADOTEST::get_type_for_column( $dbh, $row->[3] );
 #   is( $row->[ 4] , $ti->{DATA_TYPE},"Is this data type $ti->{DATA_TYPE}?");
     is( $row->[ 5] , $ti->{TYPE_NAME},"Is this type name $ti->{TYPE_NAME}?");
   }

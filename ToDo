@@ -1,4 +1,6 @@
 
+Let $dbh->{ado_ti_ver} default to 2.
+
 Adjust return codes wrt the spec
 
 Change tests to use bind_param() more often.
@@ -18,8 +20,6 @@ ParamValues: What's the reason for the following problem?
       return $h;
     }
 
-
-Improve type_info_all
 
 Add $dbh->last_insert_id
 

@@ -1,5 +1,4 @@
 #!perl -I./t
-# vim:ts=2:sw=2:ai:aw:nu:
 
 $| = 1;
 
@@ -17,7 +16,7 @@ if (defined $ENV{DBI_DSN}) {
 }
 
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
-ok ( defined $dbh, 'Connection');
+ok ( defined $dbh,'Connection');
 
 eval { $dbh->primary_key_info };
 ok( $@,"Call to primary_key_info with 0 arguments, error expected: $@");
@@ -29,9 +28,8 @@ my $catalog = undef;  # TODO: current catalog?
 my $schema  = undef;  # TODO: current schema?
 my $table   = $ADOTEST::table_name;
 
-my @types = ADOTEST::get_type_for_column( $dbh, 'A');
-ok( @types > 0, 'Type info');
-my $type = $types[0];
+my $ti = ADOTEST::get_type_for_column( $dbh,'A');
+is( ref $ti,'HASH','Type info');
 
 {
   local ($dbh->{Warn}, $dbh->{PrintError});
@@ -42,32 +40,32 @@ my $type = $types[0];
 my $sql = <<"SQL";
 CREATE TABLE $table
 (
-  K1 $type->{TYPE_NAME}
-, K2 $type->{TYPE_NAME}
+  K1 $ti->{TYPE_NAME}
+, K2 $ti->{TYPE_NAME}
 , PRIMARY KEY ( K1, K2 )
 )
 SQL
 print $sql;
 
-ok( $dbh->do( $sql ), 'Create table');
+ok( $dbh->do( $sql ),'Create table');
 
 {
   my $sth = $dbh->primary_key_info( $catalog, $schema, $table );
-  ok( defined $sth, 'Statement handle defined');
+  ok( defined $sth,'Statement handle defined');
 
-  print "Primary key columns:\n";
+  print "# Primary key columns:\n";
   my @cols;
   while ( my $row = $sth->fetch )
   {
     no warnings 'uninitialized';
     local $,  = "\t";
-    print @$row, "\n";
+    print '# ', @$row, "\n";
     push @cols, $row->[3];
   }
-  is( @cols, 2, 'Primary key columns');
+  is( @cols, 2,'Primary key columns');
   for ( 1, 2 )
   {
-    is( $cols[$_-1], 'K' . $_, 'Primary key column names');
+    is( $cols[$_-1],'K' . $_, 'Primary key column names');
   }
 }
 # -----------------------------------------------------------------------------

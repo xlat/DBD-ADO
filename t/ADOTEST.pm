@@ -22,34 +22,25 @@ use DBI qw(:sql_types);
 
 use vars qw($VERSION $table_name %TestFieldInfo %LTestFieldInfo);
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 $table_name = 'PERL_DBD_TEST';
 
 %TestFieldInfo = (
  'A' => [SQL_INTEGER, SQL_SMALLINT, SQL_TINYINT, SQL_NUMERIC, SQL_DECIMAL, SQL_FLOAT, SQL_REAL, SQL_DOUBLE]
 ,'B' => [SQL_WVARCHAR, SQL_VARCHAR, SQL_WCHAR, SQL_CHAR]
 ,'C' => [SQL_WLONGVARCHAR, SQL_LONGVARCHAR, SQL_WVARCHAR, SQL_VARCHAR]
-,'D' => [SQL_DATE, SQL_TIMESTAMP]
+,'D' => [SQL_TYPE_DATE, SQL_TYPE_TIMESTAMP, SQL_DATE, SQL_TIMESTAMP]
 );
 
 %LTestFieldInfo = (
- 'dt' => [SQL_DATE, SQL_TIMESTAMP]
+ 'dt' => [SQL_TYPE_DATE, SQL_TYPE_TIMESTAMP, SQL_DATE, SQL_TIMESTAMP]
 );
 
 sub get_type_for_column {
   my $dbh = shift;
   my $col = shift;
 
-  my @row;
-  my $sth;
-  for my $type ( @{$TestFieldInfo{$col}} ) {
-    @row = $dbh->type_info( $type );
-    # may not correct behavior, but get the first compat type
-    #print "# Type $type rows: ", scalar(@row), "\n";
-    last if @row;
-  }
-  die "Unable to find a suitable test type for field $col" unless @row;
-  return @row;
+  $dbh->type_info( $TestFieldInfo{$col} );
 }
 
 sub tab_create {
@@ -68,21 +59,21 @@ sub tab_create {
     $fields .= "$f ";
     print "# -- $fields\n";
 
-    my @row = get_type_for_column( $dbh, $f );
-    shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/i;
-    shift @row if ($row[0])->{TYPE_NAME} =~ /nclob/i;
+    my @ti = get_type_for_column( $dbh, $f );
+    shift @ti if ($ti[0])->{TYPE_NAME} =~ /identity$/i;
+    shift @ti if ($ti[0])->{TYPE_NAME} =~ /nclob/i;
 
-    my $r = shift @row;
+    my $ti = shift @ti;
 
-    $fields .= $r->{TYPE_NAME};
+    $fields .= $ti->{TYPE_NAME};
 
     # Oracle is having problems with nvarchar2(4000), cut the column size in
     # half, for now.
-    if ( defined $r->{CREATE_PARAMS} ) {
-      $fields .= '(' . int( $r->{COLUMN_SIZE} / 2 ) . ')'  # /
-        if $r->{CREATE_PARAMS} =~ /LENGTH/i;
-      $fields .= '(' . $r->{COLUMN_SIZE} . ', 0)'
-        if $r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
+    if ( defined $ti->{CREATE_PARAMS} ) {
+      $fields .= '(' . int( $ti->{COLUMN_SIZE} / 2 ) . ')'  # /
+        if $ti->{CREATE_PARAMS} =~ /LENGTH/i;
+      $fields .= '(' . $ti->{COLUMN_SIZE} . ', 0)'
+        if $ti->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
     }
     print "# -- $fields\n";
   }

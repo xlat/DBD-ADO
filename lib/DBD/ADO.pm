@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state $errcum);
 
-  $VERSION = '2.88';
+  $VERSION = '2.89';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    =  0;     # The $DBI::err value
@@ -122,6 +122,7 @@
     , LongReadLen    => 0
     , LongTruncOk    => 0
     , ado_max_errors => 50
+    , ado_ti_ver     => 1  # TypeInfo version
     });
 
 		# Get the default value;
@@ -183,17 +184,6 @@
 
 } # ====== DRIVER ======
 
-# names of adSchemaProviderTypes fields
-# my $ado_info = [qw{
-# 	TYPE_NAME DATA_TYPE COLUMN_SIZE LITERAL_PREFIX
-# 	LITERAL_SUFFIX CREATE_PARAMS IS_NULLABLE CASE_SENSITIVE
-# 	SEARCHABLE UNSIGNED_ATTRIBUTE FIXED_PREC_SCALE AUTO_UNIQUE_VALUE
-# 	LOCAL_TYPE_NAME MINIMUM_SCALE MAXIMUM_SCALE GUID TYPELIB
-# 	VERSION IS_LONG BEST_MATCH IS_FIXEDLENGTH
-# }];
-# check IS_NULLABLE => NULLABLE (only difference with DBI/ISO field names)
-# Information returned from the provider about the schema.  The column names
-# are different then the DBI spec.
 my $ado_schematables = [
 	qw{ TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS
 		TABLE_GUID TABLE_PROPID DATE_CREATED DATE_MODIFIED
@@ -700,6 +690,7 @@ my $sch_dbi_to_ado = {
 		return $sth;
 	}
 
+
 	sub column_info {
 		my( $dbh, @Criteria ) = @_;
 		my $Criteria = \@Criteria if @Criteria;
@@ -716,49 +707,50 @@ my $sch_dbi_to_ado = {
 		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order ");
 
 		while ( !$rs->{EOF} ) {
-			my $AdoType    = $rs->Fields('DATA_TYPE'   )->{Value};
-			my $ColFlags   = $rs->Fields('COLUMN_FLAGS')->{Value};
+			my $AdoType    = $rs->{DATA_TYPE   }{Value};
+			my $ColFlags   = $rs->{COLUMN_FLAGS}{Value};
 			my $IsLong     = ( $ColFlags & $ado_consts->{FieldAttributeEnum}{adFldLong } ) ? 1 : 0;
 			my $IsFixed    = ( $ColFlags & $ado_consts->{FieldAttributeEnum}{adFldFixed} ) ? 1 : 0;
 			my @SqlType    = DBD::ADO::TypeInfo::ado2dbi( $AdoType, $IsFixed, $IsLong );
-			my $IsNullable = $rs->Fields('IS_NULLABLE')->{Value} ? 'YES' : 'NO';
-			my $ColSize    = $rs->Fields('NUMERIC_PRECISION'       )->{Value}
-			              || $rs->Fields('CHARACTER_MAXIMUM_LENGTH')->{Value}
-										|| 0;  # Default value to stop warnings ???
+			my $IsNullable = $rs->{IS_NULLABLE}{Value} ? 'YES' : 'NO';
+			my $ColSize    = $rs->{NUMERIC_PRECISION       }{Value}
+			              || $rs->{CHARACTER_MAXIMUM_LENGTH}{Value}
+			              || 0;  # Default value to stop warnings ???
 			my $TypeName;
 			my $ado_tis    = DBD::ADO::db::_ado_get_type_info_for( $dbh, $AdoType, $IsFixed, $IsLong );
-			$dbh->trace_msg('  *** ' . $rs->Fields('COLUMN_NAME')->{Value} . "($ColSize): $AdoType, $IsFixed, $IsLong\n", 3 );
+			$dbh->trace_msg('  *** ' . $rs->{COLUMN_NAME}{Value} . "($ColSize): $AdoType, $IsFixed, $IsLong\n", 3 );
 			# find the first type which has a large enough COLUMN_SIZE:
 			for my $ti ( sort { $a->{COLUMN_SIZE} <=> $b->{COLUMN_SIZE} } @$ado_tis ) {
 				$dbh->trace_msg("    * => $ti->{TYPE_NAME}($ti->{COLUMN_SIZE})\n", 3 );
 				if ( $ti->{COLUMN_SIZE} >= $ColSize ) {
 					$TypeName = $ti->{TYPE_NAME};
-					last ;
+					last;
 				}
 			}
 			# unless $TypeName: Standard SQL type name???
 
-			my @Fields;
-			$Fields[ 0] = $rs->Fields('TABLE_CATALOG'           )->{Value}; # TABLE_CAT
-			$Fields[ 1] = $rs->Fields('TABLE_SCHEMA'            )->{Value}; # TABLE_SCHEM
-			$Fields[ 2] = $rs->Fields('TABLE_NAME'              )->{Value}; # TABLE_NAME
-			$Fields[ 3] = $rs->Fields('COLUMN_NAME'             )->{Value}; # COLUMN_NAME
-			$Fields[ 4] = $SqlType[0]                                     ; # DATA_TYPE !!!
-			$Fields[ 5] = $TypeName                                       ; # TYPE_NAME !!!
-			$Fields[ 6] = $ColSize                                        ; # COLUMN_SIZE !!! MAX for *LONG*
-			$Fields[ 7] = $rs->Fields('CHARACTER_OCTET_LENGTH'  )->{Value}; # BUFFER_LENGTH !!! MAX for *LONG*, ... (e.g. num)
-			$Fields[ 8] = $rs->Fields('NUMERIC_SCALE'           )->{Value}; # DECIMAL_DIGITS ???
-			$Fields[ 9] = undef                                           ; # NUM_PREC_RADIX !!!
-			$Fields[10] = $rs->Fields('IS_NULLABLE'             )->{Value}; # NULLABLE !!!
-			$Fields[11] = $rs->Fields('DESCRIPTION'             )->{Value}; # REMARKS
-			$Fields[12] = $rs->Fields('COLUMN_DEFAULT'          )->{Value}; # COLUMN_DEF
-			$Fields[13] = $SqlType[1]                                     ; # SQL_DATA_TYPE !!!
-			$Fields[14] = $SqlType[2]                                     ; # SQL_DATETIME_SUB !!!
-			$Fields[15] = $rs->Fields('CHARACTER_OCTET_LENGTH'  )->{Value}; # CHAR_OCTET_LENGTH !!! MAX for *LONG*
-			$Fields[16] = $rs->Fields('ORDINAL_POSITION'        )->{Value}; # ORDINAL_POSITION
-			$Fields[17] = $IsNullable                                     ; # IS_NULLABLE !!!
-
-			push( @Rows, \@Fields );
+			my $Fields =
+			[
+			  $rs->{TABLE_CATALOG         }{Value} #  0 TABLE_CAT
+			, $rs->{TABLE_SCHEMA          }{Value} #  1 TABLE_SCHEM
+			, $rs->{TABLE_NAME            }{Value} #  2 TABLE_NAME
+			, $rs->{COLUMN_NAME           }{Value} #  3 COLUMN_NAME
+			, $SqlType[0]                          #  4 DATA_TYPE !!!
+			, $TypeName                            #  5 TYPE_NAME !!!
+			, $ColSize                             #  6 COLUMN_SIZE !!! MAX for *LONG*
+			, $rs->{CHARACTER_OCTET_LENGTH}{Value} #  7 BUFFER_LENGTH !!! MAX for *LONG*, ... (e.g. num)
+			, $rs->{NUMERIC_SCALE         }{Value} #  8 DECIMAL_DIGITS ???
+			, undef                                #  9 NUM_PREC_RADIX !!!
+			, $rs->{IS_NULLABLE           }{Value} # 10 NULLABLE !!!
+			, $rs->{DESCRIPTION           }{Value} # 11 REMARKS
+			, $rs->{COLUMN_DEFAULT        }{Value} # 12 COLUMN_DEF
+			, $SqlType[1]                          # 13 SQL_DATA_TYPE !!!
+			, $SqlType[2]                          # 14 SQL_DATETIME_SUB !!!
+			, $rs->{CHARACTER_OCTET_LENGTH}{Value} # 15 CHAR_OCTET_LENGTH !!! MAX for *LONG*
+			, $rs->{ORDINAL_POSITION      }{Value} # 16 ORDINAL_POSITION
+			, $IsNullable                          # 17 IS_NULLABLE !!!
+			];
+			push @Rows, $Fields;
 			$rs->MoveNext;
 		}
 
@@ -771,6 +763,7 @@ my $sch_dbi_to_ado = {
 			, TYPE => [            12,         12,        12,         12,        5,       12,          4,            4,             5,             5,       5,     12,        12,            5,               5,                4,               4,         12   ]
 		});
 	}
+
 
 	sub primary_key_info {
 		my( $dbh, @Criteria ) = @_;
@@ -847,6 +840,54 @@ my $sch_dbi_to_ado = {
 
 
   sub type_info_all {
+    my ($dbh) = @_;
+    return ( $dbh->{ado_ti_ver} == 2 ) ? &type_info_all_2 : &type_info_all_1;
+  }
+
+  sub type_info_all_2 {
+    my ($dbh) = @_;
+    my $QueryType = 'adSchemaProviderTypes';
+    my $conn = $dbh->{ado_conn};
+    my @Rows;
+    my $rs = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$QueryType} );
+    return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
+
+    while ( !$rs->{EOF} ) {
+      my $AdoType = $rs->{DATA_TYPE     }{Value};
+      my $IsLong  = $rs->{IS_LONG       }{Value};
+      my $IsFixed = $rs->{IS_FIXEDLENGTH}{Value};
+      my @SqlType = DBD::ADO::TypeInfo::ado2dbi( $AdoType, $IsFixed, $IsLong );
+      my $Fields  =
+      [
+        $rs->{TYPE_NAME         }{Value} #  0 TYPE_NAME
+      , $SqlType[0]                      #  1 DATA_TYPE
+      , $rs->{COLUMN_SIZE       }{Value} #  2 COLUMN_SIZE
+      , $rs->{LITERAL_PREFIX    }{Value} #  3 LITERAL_PREFIX
+      , $rs->{LITERAL_SUFFIX    }{Value} #  4 LITERAL_SUFFIX
+      , $rs->{CREATE_PARAMS     }{Value} #  5 CREATE_PARAMS
+      , $rs->{IS_NULLABLE       }{Value} #  6 NULLABLE
+      , $rs->{CASE_SENSITIVE    }{Value} #  7 CASE_SENSITIVE
+      , $rs->{SEARCHABLE        }{Value} #  8 SEARCHABLE
+      , $rs->{UNSIGNED_ATTRIBUTE}{Value} #  9 UNSIGNED_ATTRIBUTE
+      , $rs->{FIXED_PREC_SCALE  }{Value} # 10 FIXED_PREC_SCALE
+      , $rs->{AUTO_UNIQUE_VALUE }{Value} # 11 AUTO_UNIQUE_VALUE
+      , $rs->{LOCAL_TYPE_NAME   }{Value} # 12 LOCAL_TYPE_NAME
+      , $rs->{MINIMUM_SCALE     }{Value} # 13 MINIMUM_SCALE
+      , $rs->{MAXIMUM_SCALE     }{Value} # 14 MAXIMUM_SCALE
+      , $SqlType[1]                      # 15 SQL_DATA_TYPE
+      , $SqlType[2]                      # 16 SQL_DATETIME_SUB
+      ];
+      $Fields->[8]--;
+      push @Rows, $Fields;
+      $rs->MoveNext;
+    }
+    $rs->Close; undef $rs;
+
+    # TODO: 2nd crit. for equal types
+    return [ $DBD::ADO::TypeInfo::Fields, sort { $a->[1] <=> $b->[1] } @Rows ];
+  }
+
+  sub type_info_all_1 {
     my ($dbh) = @_;
     my $names = {
       TYPE_NAME          =>  0
@@ -1862,12 +1903,30 @@ More detailed notes can be found at
 
 =head2 Type info
 
-Support for type_info_all is supported, however, you're not using
-a true OLE DB provider (using the MS OLE DB -> ODBC), the first
-hash may not be the "best" solution for the data type.
-adSchemaProviderTypes does provide for a "best match" column, however
-the MS OLE DB -> ODBC provider does not support the best match.
-Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
+There exists two implementations of type_info_all(). Which version is
+used depends on the ado_ti_ver database handle attribute:
+
+=over
+
+=item C<$dbh-E<gt>{ado_ti_ver} = 1> (default)
+
+The first implementations tries to find for various DBI types a set of
+ADO types supported by the provider. The algorithm is highly sophisticated.
+It tends to generate more duplicate type codes and names.
+
+=item C<$dbh-E<gt>{ado_ti_ver} = 2>
+
+The second implementations is quite straightforward. It uses the set
+which the provider returns and tries to map various ADO codes to
+DBI/ODBC codes. The mapping is similar to the one used in column_info().
+Duplicate type codes and names tend to occur less often.
+The rows are ordered by DATA_TYPE, but not necessarily by 'how closely
+each type maps to the corresponding ODBC SQL data type'. This second
+sort criterion is difficult to achieve.
+
+=back
+
+B<Note:> The next release may default to the second version!
 
 
 =head1 AUTHORS
