@@ -37,7 +37,6 @@ ok( $dbh->{'AutoCommit'} = 1, "Set AutoCommit ON" );
 # ------------------------------------------------------------
 
 my $rows = 0;
-# TBD: Check for tables function working.  
 
 ok( @row = $dbh->tables(), " tables() return a list of tables." );
 
@@ -110,8 +109,8 @@ sub commitTest {
 		my $r = shift @row;
 		$pf = $r->{LITERAL_PREFIX};
 		$sf = $r->{LITERAL_SUFFIX};
-		$pf = qq/{d \'/ unless $pf;
-		$sf = qq/\' }/  unless $sf;
+		$pf = qq/{d \'/ unless $pf; #'
+		$sf = qq/\' }/  unless $sf; #'
 
     $dbh->do("DELETE FROM $ADOTEST::table_name WHERE A = 100") or return undef;
 

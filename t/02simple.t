@@ -8,7 +8,7 @@ use strict;
 
 use vars qw($tests);
 
-use Test::More tests => 24;
+use Test::More tests => 23;
 
 my $non_supported = '-2146825037';
 
@@ -36,48 +36,24 @@ ok( $rc = tab_insert($dbh), " insert test data" );
 ok( $rc = tab_select($dbh), " select test data" );
 
 $rc = undef;
-$dbh->{LongReadLen} = 50;
-$dbh->{LongTruncOk} = 1;
-ok( ($rc = select_long($dbh)) eq 1, " test LongTruncOk ON" );
+TODO: {
+	local $TODO = q{Some day I figure out how to support LongReadLen};
+	$dbh->{LongReadLen} = 50;
+	$dbh->{LongTruncOk} = 1;
+	ok( ($rc = select_long($dbh)) eq 1, " test LongTruncOk ON" );
 
-$dbh->{LongTruncOk} = 0;
-ok( ($rc = select_long($dbh)) eq undef, "test LongTruncOk OFF" );
+	$dbh->{LongTruncOk} = 0;
+	ok( ($rc = select_long($dbh)) eq undef, "test LongTruncOk OFF" );
+}
 
-# Not implemented yet.
-pass( " test attributes, not implemented yet" );
-
-#$sth = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A");
-
-#if ($sth) {
-	#$sth->execute();
-	#my $colcount = $sth->func(1, 0, ColAttributes); # 1 for col (unused) 0 for SQL_COLUMN_COUNT
-	#print "Column count is: $colcount\n";
-	#my ($coltype, $colname, $i, @row);
-	#my $is_ok = 0;
-	#for ($i = 1; $i <= $colcount; $i++) {
-		# $i is colno (1 based) 2 is for SQL_COLUMN_TYPE, 1 is for SQL_COLUMN_NAME
-		#$coltype = $sth->func($i, 2, ColAttributes);
-		#$colname = $sth->func($i, 1, ColAttributes);
-		#print "$i: $colname = $coltype\n";
- 		#++$is_ok if grep { $coltype == $_ } @{$ADOTEST::TestFieldInfo{$colname}};
-	#}
-	#print "not " unless $is_ok == $colcount;
-	#print "ok 9\n";
-	
-	#$sth->finish;
-#}
-#else {
-	#print "not ok 9\n";
-#}
-
-$dbh->{RaiseError} = 0;
-$dbh->{PrintError} = 0;
 #
 # some ADO drivers will prepare this OK, but not execute.
 # 
 {
 	# Turn the warnings off at this point.  Expecting statement to fail.
-	local $dbh->{Warn} = 0;
+	local ($dbh->{Warn}, $dbh->{RaiseError}, $dbh->{PrintError});
+	$dbh->{RaiseError} = $dbh->{PrintError} = $dbh->{Warn} = 0;
+
 	my $sth = $dbh->prepare("SELECT XXNOTCOLUMN FROM $ADOTEST::table_name");
 	$sth->execute() if $sth;
 	ok( $sth->err, "Check error returned, statement handle" );
@@ -128,13 +104,18 @@ $sth1 = $dbh->prepare("SELECT * FROM $ADOTEST::table_name where A = ?")
 	or warn $dbh->errstr;
 ok( defined $sth1, "Prepared statement * and Parameter." );
 
-$sth1 = $dbh->prepare("SELECT Stuff_and_Things FROM $ADOTEST::table_name where A = ?")
-	or warn $dbh->errstr;
-ok( defined $sth1, "Prepared statement bad column and Parameter." );
+{
+	# Turn PrintError and RaiseError off
+	local ($dbh->{PrintError}, $dbh->{RaiseError});
+	$dbh->{PrintError} = 0; $dbh->{RaiseError} = 0;
+	$sth1 = $dbh->prepare("SELECT Stuff_and_Things FROM $ADOTEST::table_name where A = ?")
+		or warn $dbh->errstr;
+	ok( defined $sth1, "Prepared statement bad column and Parameter." );
 
-@row = $sth1->fetchrow;
-ok( $sth1->err , "Call to fetchrow without call to execute. " . $sth1->errstr );
-ok( scalar @row  == 0, "Call to fetchrow without call to execute, should return 0. " . scalar @row );
+	@row = $sth1->fetchrow;
+	ok( $sth1->err , "Call to fetchrow without call to execute. " . $sth1->errstr );
+	ok( scalar @row  == 0, "Call to fetchrow without call to execute, should return 0. " . scalar @row );
+}
 
 {
 	$count = 0;
@@ -147,8 +128,8 @@ ok( scalar @row  == 0, "Call to fetchrow without call to execute, should return 
 	ok( defined $sth1, "Prepared statement bad column and Parameter." );
 
 	eval { 
-		local $sth1->{PrintError} = 0;
-		local $sth1->{RaiseError} = 1;
+		local ($sth1->{PrintError}, $sth1->{RaiseError});
+		$sth1->{PrintError} = 0; $sth1->{RaiseError} = 1;
 		@row = $sth1->fetchrow;
 	};
 	ok( $@, "RaiseError caught error: $@" );

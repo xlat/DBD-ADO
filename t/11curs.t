@@ -8,7 +8,7 @@ use Data::Dumper;
 use strict;
 my ($pf, $sf);
 
-use Test::More tests => 36;
+use Test::More tests => 74;
 
 BEGIN { use_ok( 'DBD::ADO' ); }
 
@@ -103,17 +103,17 @@ foreach my $ct (@CursorTypes) {
 }
 
 $dbh->{Warn} = 0;
-my @ad = qw{adSchemaPrimaryKeys adSchemaDBInfoKeywords adSchemaColumns adSchemaCatalogs};
-foreach my $ad (@ad) {
-	# print "Checking func: OpenSchema : $ad\n";
-	# print "->$ad\n";
+foreach my $ad (<DATA>) {
+	chomp $ad;
+	print "Checking func: OpenSchema : $ad\n";
+	print "->$ad\n";
 	$sth1 = $dbh->func( qq{$ad}, 'OpenSchema' );
 	SKIP: {
 		skip "OpenSchema: $ad, not supported by Provider", 1 
 			unless ( defined $sth1 );
 		ok(  defined $sth1, " Test function call 'OpenSchema': $ad : return statement handle" );
 
-		# print join( ",", map { defined $_ ? $_ : 'undef' } @{$sth1->{NAME}}), "\n";
+		print "\n", join( ",", map { defined $_ ? $_ : 'undef' } @{$sth1->{NAME}}), "\n";
 
 		# while( my @row = $sth1->fetchrow_array ) {
 		# 	print join( ",", map { defined $_ ? $_ : 'undef' } @row ), "\n";
@@ -130,9 +130,12 @@ eval {
 
 ok( $@, " call to OpenSchema with bad argument" );
 
+$sth1 = undef;
+
 # MS SQL test.
 # {
-# 	local ($dbh->{AutoCommit}) = 0;
+# 	local ($dbh->{AutoCommit});
+# 	$dbh->{AutoCommit} = 0;
 # 	$dbh->rollback;
 # 
 # pass( "Test creating executing statement handle 2 while looping statement handle 1" );
@@ -162,6 +165,8 @@ ok( $@, " call to OpenSchema with bad argument" );
 # $sth1->finish;
 # 
 # }
+
+ok( $dbh->do( qq{drop table $ADOTEST::table_name} ) , " Drop test table" );
 
 exit(0);
 
@@ -293,7 +298,44 @@ sub select_long
 }
 
 __END__
-
-
-
-
+adSchemaAsserts
+adSchemaCatalogs
+adSchemaCharacterSets
+adSchemaCheckConstraints
+adSchemaCollations
+adSchemaColumnPrivileges
+adSchemaColumns
+adSchemaColumnsDomainUsage
+adSchemaConstraintColumnUsage
+adSchemaConstraintTableUsage
+adSchemaCubes
+adSchemaDBInfoKeywords
+adSchemaDBInfoLiterals
+adSchemaDimensions
+adSchemaForeignKeys
+adSchemaHierarchies
+adSchemaIndexes
+adSchemaKeyColumnUsage
+adSchemaLevels
+adSchemaMeasures
+adSchemaMembers
+adSchemaPrimaryKeys
+adSchemaProcedureColumns
+adSchemaProcedureParameters
+adSchemaProcedures
+adSchemaProperties
+adSchemaProviderSpecific
+adSchemaProviderTypes
+adSchemaReferentialConstraints
+adSchemaSchemata
+adSchemaSQLLanguages
+adSchemaStatistics
+adSchemaTableConstraints
+adSchemaTablePrivileges
+adSchemaTables
+adSchemaTranslations
+adSchemaTrustees
+adSchemaUsagePrivileges
+adSchemaViewColumnUsage
+adSchemaViews
+adSchemaViewTableUsage

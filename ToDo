@@ -1,0 +1,8 @@
+
+Mon  Apr 8, 2002  23:06:36
+Modify code to use new package DBD::ADO::TypeInfo
+
+Clean up the ADO -> ODBC and ODBC -> ADO code.
+
+Fix the blob/clob/long support, including tests which I broke in version 2.5
+

@@ -27,9 +27,9 @@ require 5.004;
     $table_name = "PERL_DBD_TEST";
 
     %TestFieldInfo = (
-	'A' => [SQL_SMALLINT,SQL_BIGINT, SQL_TINYINT, SQL_NUMERIC, SQL_DECIMAL, SQL_FLOAT, SQL_REAL, SQL_DOUBLE],
+	'A' => [SQL_SMALLINT, SQL_TINYINT, SQL_NUMERIC, SQL_DECIMAL, SQL_FLOAT, SQL_REAL, SQL_DOUBLE],
 	'B' => [SQL_WVARCHAR, SQL_VARCHAR, SQL_WCHAR, SQL_CHAR],
-	'C' => [SQL_WLONGVARCHAR, SQL_LONGVARCHAR],
+	'C' => [SQL_WLONGVARCHAR, SQL_LONGVARCHAR, SQL_WVARCHAR, SQL_VARCHAR],
 	'D' => [SQL_DATE, SQL_TIMESTAMP],
     );
 
@@ -57,11 +57,13 @@ sub get_type_for_column {
 	
 sub tab_create {
 	my $dbh = shift;
-	$dbh->{PrintError} = 0;
-	eval {
-	    $dbh->do("DROP TABLE $table_name");
-	};
-	$dbh->{PrintError} = 1;
+			{
+				local ($dbh->{PrintError}, $dbh->{RaiseError}, $dbh->{Warn});
+				$dbh->{PrintError} = $dbh->{RaiseError} = $dbh->{Warn} = 0;
+	    	$dbh->do("DROP TABLE $table_name");
+			}
+
+	# $dbh->{PrintError} = 1;
 
 	# trying to use ADO to tell us what type of data to use,
 	# instead of the above.
@@ -72,29 +74,33 @@ sub tab_create {
 	    $fields .= ", " unless !$fields;
 	    $fields .= "$f ";
 	    print "-- $fields\n";
+
 	    my @row = get_type_for_column($dbh, $f);
 			shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/i;
 			shift @row if ($row[0])->{TYPE_NAME} =~ /nclob/i;
-			my $rchk = ($row[0])->{DATA_TYPE};
-			
+
+			#my $rchk = ($row[0])->{DATA_TYPE};
+
 			$r = shift @row;
+
 	    $fields .= $r->{TYPE_NAME};
-	    if ($r->{CREATE_PARAMS}) {
-		$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{)} 
-			if ($r->{CREATE_PARAMS} =~ /LENGTH/i);
-		$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{, 0)} 
-			if ($r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i);
-	    }
-	    print "-- $fields\n";
-	}
-	print "Using fields: $fields\n";
-	return $dbh->do(qq{CREATE TABLE $table_name ($fields)});
+
+			if (defined $r->{CREATE_PARAMS}) {
+				$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{)} 
+					if ($r->{CREATE_PARAMS} =~ /LENGTH/i);
+				$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{, 0)} 
+					if ($r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i);
+			}
+print "-- $fields\n";
+}
+print "Using fields: $fields\n";
+return $dbh->do(qq{CREATE TABLE $table_name ($fields)});
 }
 
 
     sub tab_delete {
-	my $dbh = shift;
-	$dbh->do("DELETE FROM $table_name");
+			my $dbh = shift;
+			$dbh->do("DELETE FROM $table_name");
     }
 
     sub tab_exists {
@@ -132,14 +138,15 @@ sub tab_long_create {
 	my $dbh = shift;
 	my ($idx, $idx_type, $idx_num,
 		$col_name, $lng_type, $type_num) = @_;
-	$dbh->{PrintError} = 0;
 	my $table_name = qw/perl_dbd_ado_long/;
-	eval {
-	    $dbh->do("DROP TABLE $table_name");
-	};
+	{
+			local ($dbh->{PrintError});
+			$dbh->{PrintError} = 0;
+    	$dbh->do("DROP TABLE $table_name");
+	}
 
 
-	$dbh->{PrintError} = 1;
+#	$dbh->{PrintError} = 1;
 
 	# trying to use ADO to tell us what type of data to use,
 	# instead of the above.

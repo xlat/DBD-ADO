@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -sw
 #
-# $Id: Makefile.PL,v 1.1.1.1 2000/06/01 17:52:31 talowery Exp $
+# $Id: Makefile.PL,v 1.4 2002/06/06 01:56:29 talowery Exp $
 #
 # You may distribute under the terms of either the GNU General Public
 # License or the Artistic License, as specified in the Perl README file.
@@ -27,18 +27,25 @@ my %opts =
     },
 );
 if ($ExtUtils::MakeMaker::VERSION >= 5.43) {
-    $opts{AUTHOR} = 'Tim Bunce and Philip ( http://www.isc.org/dbi-lists.html )';
+    $opts{AUTHOR} = 'Tim Bunce, Philip, and Thomas Lowery ( http://dbi.perl.org )';
     $opts{ABSTRACT} = 'ADO driver for the DBI module.';
     $opts{PREREQ_PM} = { DBI => 0 };
     $opts{CAPI} = 'TRUE' if $Config{archname} =~ /-object\b/i;
 }
 
 $::opt_g = 0;
-$::opt_o = '';
+$::opt_o = $::opt_o = '';
+
 GetOptions(qw(g! o=s)) or die "Invalid arguments";
 
 $opts{OPTIMIZE} = '-g -O0' if $::opt_g;
 
+if ($^O !~ /win32/i) {
+print <<"EOM";
+	Currently DBD::ADO only works on Win32 machines!
+EOM
+exit unless ($ENV{USER} =~ /tlowery/i);
+}
 
 print "\nConfiguring DBD::ADO ...\n
 >>>\tRemember to actually *READ* the README file!
@@ -57,8 +64,10 @@ The DBD::ADO tests will use these values for the database connection:
     DBI_USER=$ENV{DBI_USER}
     DBI_PASS=$ENV{DBI_PASS}
 };
-print "Warning: not all required environment variables are set.\n"
-	unless ($ENV{DBI_DSN} && $ENV{DBI_USER} && $ENV{DBI_PASS});
+unless ($ENV{DBI_DSN} && $ENV{DBI_USER} && $ENV{DBI_PASS}) {
+print 
+qq{Warning: not all required environment variables are set.  Using default.};
+}
 print "Warning: DBI_DSN ($ENV{DBI_DSN}) doesn't start with 'dbi:ADO:'\n"
 	if ($ENV{DBI_DSN} && $ENV{DBI_DSN} !~ m/^dbi:ADO:/);
 print "\n";

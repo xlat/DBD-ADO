@@ -1,3 +1,22 @@
+Changes Version 2.5: Mon  Apr 8, 2002  23:00:39
+
+	Bug fix from Jacqui Caren <jacqui.caren@ig.co.uk>, apply to bind image.
+	
+	Meta Data support from Steffen Goeldner.
+		Includes: 
+			get_info
+			Improved table_info
+			column_info
+			primary_key_info
+			foreign_key_info
+			Improved ADO to ODBC type conversions.
+
+	package DBD::ADO::TypeInfo from Steffen Goeldner, however 
+	none of the current code is using this package, yet.
+
+	Remove temp constants needed until DBI support SQL_* values.
+
+	Added more tests.  
 
 Changes Version 2.4: Tue Oct 23 23:25:42 EDT 2001
 	Patch for supporting primary_key_info from Steffen Goeldner <s.goeldner@eurodata.de>
