@@ -1,3 +1,12 @@
+2004-02-08  2.88
+
+  Removed $dbh->{ado_provider_auto_commit_comments} and renamed
+  $dbh->{ado_provider_support_auto_commit} to $dbh->{ado_txn_capable}.
+
+  Changed $dbh->FETCH to handle only 'ado_'-attributes.
+
+  Replaced duplicated code in DESTROY() with a call to finish().
+
 2004-02-01  2.87
 
   Fixed a bug when fetching data from a result set with non-unique

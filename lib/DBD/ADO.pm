@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state $errcum);
 
-  $VERSION = '2.87';
+  $VERSION = '2.88';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    =  0;     # The $DBI::err value
@@ -95,12 +95,6 @@
 
   $DBD::ADO::dr::imp_data_size = 0;
 
-	use constant DBPROPVAL_TC_ALL        => 8;
-	use constant DBPROPVAL_TC_DDL_IGNORE => 4;
-	use constant DBPROPVAL_TC_DDL_COMMIT => 2;
-	use constant DBPROPVAL_TC_DML        => 1;
-	use constant DBPROPVAL_TC_NONE       => 0;
-
   sub data_sources {
     my($drh, $attr) = @_;
     my @list = ();
@@ -113,22 +107,22 @@
     return @list;
   }
 
-	sub connect {
-		my ($drh, $dsn, $user, $auth) = @_;
+  sub connect {
+    my ($drh, $dsn, $user, $auth) = @_;
 
-		local $Win32::OLE::Warn = 0;
-		my $conn = Win32::OLE->new('ADODB.Connection');
-		return if DBD::ADO::Failed( $drh,"Can't create 'ADODB.Connection'");
+    local $Win32::OLE::Warn = 0;
+    my $conn = Win32::OLE->new('ADODB.Connection');
+    return if DBD::ADO::Failed( $drh,"Can't create 'ADODB.Connection'");
 
-		my ($outer, $this) = DBI::_new_dbh($drh, {
-			Name => $dsn,
-			User => $user,
-			AutoCommit => 1,
-			Warn => 0,
-			LongReadLen => 0,
-			LongTruncOk => 0,
-			ado_max_errors => 50,
-		});
+    my ($outer, $this) = DBI::_new_dbh( $drh, {
+      Name           => $dsn
+    , User           => $user
+    , AutoCommit     => 1
+    , Warn           => 0
+    , LongReadLen    => 0
+    , LongTruncOk    => 0
+    , ado_max_errors => 50
+    });
 
 		# Get the default value;
 		$this->{ado_commandtimeout} = $conn->{CommandTimeout};
@@ -136,8 +130,8 @@
 		$conn->{CommandTimeout} = \$this->{ado_commandtimeout};
 
 		$this->{ado_conn} = $conn;
-		$drh->trace_msg( "->ADO Connection: " . ref $this->{ado_conn} .
-			" Connection: " . ref $conn . "\n", 1);
+		$drh->trace_msg('    -- ADO Connection: ' . ref $this->{ado_conn} .
+			' Connection: ' . ref $conn . "\n", 5 );
 		##  ODBC rule - Null is not the same as an empty password...
 		$auth = '' if !defined $auth;
 
@@ -170,43 +164,16 @@
 		$conn->Open( $cdsn, $user, $auth );
 		return if DBD::ADO::Failed( $drh,"Can't connect to '$dsn'");
 
-		# Determine if the provider supports transaction.
-		my $auto = 0;
+		# Determine transaction support
 		eval {
-			$auto = $conn->Properties->{qq{Transaction DDL}}->{Value};
-		if ( $auto eq &DBPROPVAL_TC_ALL ) {
-			$this->{ado_provider_support_auto_commit} = $auto;
-			$this->{ado_provider_auto_commit_comments} =
-				qq{Transactions can contain DDL and DML statements in any order.};
-		} elsif ( $auto eq &DBPROPVAL_TC_DDL_COMMIT ) {
-			$this->{ado_provider_support_auto_commit} = $auto;
-			$this->{ado_provider_auto_commit_comments} =
-				qq{Transactions can contain DML statements.  DDL statements within a transaction cause the transaction to be committed.};
-		} elsif ( $auto eq &DBPROPVAL_TC_DDL_IGNORE )  {
-			$this->{ado_provider_support_auto_commit} = $auto;
-			$this->{ado_provider_auto_commit_comments} =
-				qq{Transactions can only contain DML statements.  DDL statements within a transaction are ignored.};
-		} elsif ( $auto eq &DBPROPVAL_TC_DML )  {
-			$this->{ado_provider_support_auto_commit} = $auto;
-			$this->{ado_provider_auto_commit_comments} =
-				qq{Transactions can only contain Data Manipulation (DML) statements.  DDL statements within a trnsaction cause an error.};
-		} else {
-			$this->{ado_provider_support_auto_commit} = $auto;
-			$this->{ado_provider_auto_commit_comments} =
-				qq{Transactions are not supported.};
-		}
+			$this->{ado_txn_capable} = $conn->{Properties}{'Transaction DDL'}{Value};
 		};
-		if ($@) {
-			warn "No transactions";
-			$this->{ado_provider_support_auto_commit} = 0;
-			$this->{ado_provider_auto_commit_comments} =
-				qq{Transactions are not supported.};
-			$auto = 0;
+		if ( $@ ) {
+			$this->{ado_txn_capable} = 0;
 			my $lastError = DBD::ADO::errors($conn);
+			$drh->trace_msg("    -- Can't determine transaction support: $lastError\n", 5 );
 		}
-
-		$drh->trace_msg( "->> Transaction support: $auto " .
-			$this->{ado_provider_auto_commit_comments} . "\n",1);
+		$drh->trace_msg("    -- Transaction support: $this->{ado_txn_capable}\n", 5 );
 
     $outer->STORE('Active', 1 );
 		return $outer;
@@ -284,9 +251,9 @@ my $sch_dbi_to_ado = {
 			$dbh->trace_msg('    -- Modified ADO Connection Attributes: ' . $conn->{Attributes} . "\n");
 
 			my $auto = $dbh->{AutoCommit};
-			$dbh->trace_msg("    -- AutoCommit: $auto, Provider Support: $dbh->{ado_provider_support_auto_commit}, Comments: $dbh->{ado_provider_auto_commit_comments}\n");
+			$dbh->trace_msg("    -- AutoCommit: $auto, Provider Support: $dbh->{ado_txn_capable}\n");
 			$conn->RollbackTrans unless $auto and
-				not $dbh->{ado_provider_support_auto_commit};
+				not $dbh->{ado_txn_capable};
 			$lastError = DBD::ADO::errors($conn);
 			return $dbh->set_err( $DBD::ADO::err || -1,"Failed to execute rollback: $lastError") if $lastError && $lastError !~ m/-2147168242/;
 			# Provider error about txn not started. Ignore message, clear error codes.
@@ -306,8 +273,8 @@ my $sch_dbi_to_ado = {
 
 		return warn "Commit ineffective when AutoCommit is on\n"
 			if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
-		return Carp::carp $dbh->{ado_provider_auto_commit_comments}
-			unless $dbh->{ado_provider_support_auto_commit};
+		return Carp::carp 'Transactions are not supported'
+			unless $dbh->{ado_txn_capable};
     if ( $dbh->FETCH('BegunWork') ) {
       $dbh->{AutoCommit} = 1;
       $dbh->SUPER::STORE('BegunWork', 0 );
@@ -329,8 +296,8 @@ my $sch_dbi_to_ado = {
 
 		return Carp::carp "Rollback ineffective when AutoCommit is on\n"
 			if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
-		return Carp::carp $dbh->{ado_provider_auto_commit_comments}
-			unless $dbh->{ado_provider_support_auto_commit};
+		return Carp::carp 'Transactions are not supported'
+			unless $dbh->{ado_txn_capable};
     if ( $dbh->FETCH('BegunWork') ) {
       $dbh->{AutoCommit} = 1;
       $dbh->SUPER::STORE('BegunWork', 0 );
@@ -878,73 +845,59 @@ my $sch_dbi_to_ado = {
 		});
 	}
 
-		sub type_info_all {
-		my ($dbh) = @_;
-		my $names = {
-      TYPE_NAME		=> 0,
-      DATA_TYPE		=> 1,
-      COLUMN_SIZE		=> 2,
-      LITERAL_PREFIX	=> 3,
-      LITERAL_SUFFIX	=> 4,
-      CREATE_PARAMS		=> 5,
-      NULLABLE		=> 6,
-      CASE_SENSITIVE	=> 7,
-      SEARCHABLE		=> 8,
-      UNSIGNED_ATTRIBUTE	=> 9,
-      FIXED_PREC_SCALE	=>10,
-      AUTO_UNIQUE_VALUE	=>11,
-      LOCAL_TYPE_NAME	=>12,
-      MINIMUM_SCALE		=>13,
-      MAXIMUM_SCALE		=>14,
+
+  sub type_info_all {
+    my ($dbh) = @_;
+    my $names = {
+      TYPE_NAME          =>  0
+    , DATA_TYPE          =>  1
+    , COLUMN_SIZE        =>  2
+    , LITERAL_PREFIX     =>  3
+    , LITERAL_SUFFIX     =>  4
+    , CREATE_PARAMS      =>  5
+    , NULLABLE           =>  6
+    , CASE_SENSITIVE     =>  7
+    , SEARCHABLE         =>  8
+    , UNSIGNED_ATTRIBUTE =>  9
+    , FIXED_PREC_SCALE   => 10
+    , AUTO_UNIQUE_VALUE  => 11
+    , LOCAL_TYPE_NAME    => 12
+    , MINIMUM_SCALE      => 13
+    , MAXIMUM_SCALE      => 14
     };
-		# Based on the values from the current provider.
-		my @myti;
-		# my $sth = $dbh->func('adSchemaProviderTypes','OpenSchema');
+    # If the type information is previously obtained, use it.
+    unless( $dbh->{ado_all_types_supported} ) {
+      ado_determine_type_support( $dbh )
+        or Carp::croak 'ado_determine_type_support failed: ', $dbh->{errstr};
+    }
+    my $ops = ado_open_schema( $dbh,'adSchemaProviderTypes')
+      or Carp::croak 'ops undefined!';
 
-		# If the type information is previously obtained, use it.
-		unless( $dbh->{ado_all_types_supported} ) {
-			&_determine_type_support or
-				Carp::croak "_determine_type_support failed: ", $dbh->{errstr};
-		}
+    my $sth = DBI->connect('dbi:Sponge:','','', { RaiseError => 1 } )->prepare(
+      'adSchemaProviderTypes', { rows => [ @{$dbh->{ado_all_types_supported}} ]
+    , NAME => [ @{$ops->{NAME}} ]
+    });
+    $ops->finish; $ops = undef;
 
-		my $ops = ado_open_schema( $dbh,'adSchemaProviderTypes');
-		Carp::croak "ops undefined!" unless defined $ops;
-
-		my $ado_info		= [ @{$ops->{NAME}} ];
-		$ops->finish; $ops = undef;
-
-		my $sponge = DBI->connect("dbi:Sponge:","","",{ PrintError => 1, RaiseError => 1 });
-		Carp::croak "sponge return undefined: $DBI::errstr" unless defined $sponge;
-
-		my $sth = $sponge->prepare("adSchemaProviderTypes", {
-			rows=>   [ @{$dbh->{ado_all_types_supported}} ] , NAME=> $ado_info,
-		});
-
-		while ( my $row = $sth->fetchrow_hashref ) {
-			my @tyinfo;
-			# Only add items from the above names list.  When
-			# this list explans, the code 'should' still work.
-			for my $n (keys %{$names}){
-				$tyinfo[ $names->{$n} ] = $row->{$n} || '';
-			}
-			push( @myti, \@tyinfo );
-		}
-
-		$sth->finish; $sth = undef;
-		$sponge->disconnect; $sponge = undef;
-
-		my $ti = [ $names, @myti ];
-
-		return $ti;
-	}
+    my @ti;
+    while ( my $row = $sth->fetchrow_hashref ) {
+      my $ti;
+      # Only add items from the above names list.
+      # When this list explans, the code 'should' still work.
+      while ( my ( $k, $v ) = each %$names ) {
+        $ti->[$v] = $row->{$k} || '';
+      }
+      push @ti, $ti;
+    }
+    return [ $names, @ti ];
+  }
 
 
-	# This is a function, not a method.
-	sub _determine_type_support {
+	sub ado_determine_type_support {
 		my ($dbh) = @_;
 		die 'dbh undefined' unless $dbh;
 
-		$dbh->trace_msg("    -> _determine_type_support\n");
+		$dbh->trace_msg("    -> ado_determine_type_support\n");
 
 		my $conn = $dbh->{ado_conn};
 		my $Enums = DBD::ADO::Const->Enums;
@@ -1100,21 +1053,21 @@ my $sch_dbi_to_ado = {
 				push @{$dbh->{ado_all_types_supported}}, \@rec;
 			}
 		}
-		$dbh->trace_msg("    <- _determine_type_support\n");
+		$dbh->trace_msg("    <- ado_determine_type_support\n");
 		return \@{$dbh->{ado_all_types_supported}};
 	}
 
-	sub _ado_get_type_info_for {
-		my ($dbh, $AdoType, $IsFixed, $IsLong ) = @_;
+  sub _ado_get_type_info_for {
+    my ($dbh, $AdoType, $IsFixed, $IsLong ) = @_;
 
-		unless( $dbh->{ado_type_info_hash} ) {
-			my $sth = $dbh->func('adSchemaProviderTypes','OpenSchema');
-			while ( my $r = $sth->fetchrow_hashref ) {
-				push @{$dbh->{ado_type_info_hash}{$r->{DATA_TYPE}}{$r->{IS_FIXEDLENGTH}}{$r->{IS_LONG}}}, $r;
-			}
-		}
-		$dbh->{ado_type_info_hash}{$AdoType}{$IsFixed}{$IsLong} || [];
-	}
+    unless( $dbh->{ado_type_info_hash} ) {
+      my $sth = $dbh->func('adSchemaProviderTypes','OpenSchema');
+      while ( my $r = $sth->fetchrow_hashref ) {
+        push @{$dbh->{ado_type_info_hash}{$r->{DATA_TYPE}}{$r->{IS_FIXEDLENGTH}}{$r->{IS_LONG}}}, $r;
+      }
+    }
+    $dbh->{ado_type_info_hash}{$AdoType}{$IsFixed}{$IsLong} || [];
+  }
 
 
   sub ado_open_schema {
@@ -1134,28 +1087,25 @@ my $sch_dbi_to_ado = {
   *OpenSchema = \&ado_open_schema;
 
 
-	sub FETCH {
-		my ($dbh, $attrib) = @_;
-		# If the attribute contains ado_, return the value.
-		$dbh->trace_msg( "->Fetch: $attrib\n", 3);
-		my $value;
-		if ( exists $dbh->{$attrib} ) {
-			return $dbh->{$attrib};
-		} else {
-			eval {
-				$attrib =~ s/^ado_//;
-				local $Win32::OLE::Warn = 0;
-				$value = $dbh->{ado_conn}->{$attrib};
-				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
-				$lastError = undef if $lastError =~ m/0x80020007/;
-				die "Died on:\n$lastError" if $lastError;
-			};
-		}
-		return $value unless $@;
-		# else pass up to DBI to handle
-		return $dbh->SUPER::FETCH($attrib);
-		# return $dbh->DBD::_::db::FETCH($attrib);
-	}
+  sub FETCH {
+    my ($dbh, $attrib) = @_;
+
+    if ( $attrib =~ m/^ado_/) {
+      return $dbh->{$attrib} if exists $dbh->{$attrib};
+      my $value;
+      eval {
+        $attrib =~ s/^ado_//;
+        local $Win32::OLE::Warn = 0;
+        my $conn = $dbh->{ado_conn};
+        $value = $conn->{$attrib};
+        my $lastError = DBD::ADO::errors($conn);
+        $lastError = undef if $lastError =~ m/0x80020007/;
+        die "Died on:\n$lastError" if $lastError;
+      };
+      return $value unless $@;
+    }
+    return $dbh->SUPER::FETCH( $attrib );
+  }
 
 	sub STORE {
 		my ($dbh, $attrib, $value) = @_;
@@ -1172,14 +1122,11 @@ my $sch_dbi_to_ado = {
 			# Return the value is auto commit is not support and
 			# value is not zero.  Handles defaults.
 			return $value if $value
-				and not $dbh->{ado_provider_support_auto_commit};
+				and not $dbh->{ado_txn_capable};
 			# Cause the application to die, user attempting to
 			# change the auto commit value.
-			Carp::croak
-				qq{Provider does not support auto commit: },
-				$dbh->{ado_provider_auto_commit_comments},
-				qq{\n}
-			unless $dbh->{ado_provider_support_auto_commit};
+			Carp::croak "Provider does not support auto commit\n"
+				unless $dbh->{ado_txn_capable};
 			return $dbh->{AutoCommit} = _auto_commit($dbh, $value);
 		}
 		# If the attribute contains ado_, return the value.
@@ -1470,12 +1417,15 @@ my $sch_dbi_to_ado = {
 		return $rows || '0E0';  # seems more reliable than $rs->RecordCount
   }
 
-	sub rows {
-		my ($sth) = @_;
-		return unless defined $sth;
-		my $rc = $sth->{ado_rows};
-		return defined $rc ? $rc : -1;
-	}
+
+  sub rows {
+    my ($sth) = @_;
+
+    return unless defined $sth;
+    my $rc = $sth->{ado_rows};
+    return defined $rc ? $rc : -1;
+  }
+
 
   sub fetch {
     my ($sth) = @_;
@@ -1492,12 +1442,12 @@ my $sch_dbi_to_ado = {
     return if DBD::ADO::Failed( $sth,'Fetch failed');
 
     my @row = map { $_->Value } Win32::OLE::in( $rs->Fields );
-		# Jan Dubois jand@activestate.com addition to handle changes
-		# in Win32::OLE return of Variant types of data.
-		for ( @row ) {
-			$_ = $_->As( Win32::OLE::Variant::VT_BSTR() )
-				if UNIVERSAL::isa($_, 'Win32::OLE::Variant');
-		}
+    # Jan Dubois jand@activestate.com addition to handle changes
+    # in Win32::OLE return of Variant types of data.
+    for ( @row ) {
+      $_ = $_->As( Win32::OLE::Variant::VT_BSTR() )
+        if UNIVERSAL::isa($_, 'Win32::OLE::Variant');
+    }
     map { s/\s+$// } @row if $sth->FETCH('ChopBlanks');
 
     $sth->{ado_rownum}++;
@@ -1507,69 +1457,57 @@ my $sch_dbi_to_ado = {
 
   *fetchrow_arrayref = \&fetch;
 
-	sub finish {
-		my ($sth) = @_;
-		my $rs = $sth->{ado_rowset};
-		$rs->Close () if $rs and
-			$rs->State & $ado_consts->{ObjectStateEnum}{adStateOpen};
-		$sth->{ado_rowset} = undef;
-		return $sth->STORE(Active => 0);
-	}
 
-	sub FETCH {
-    my ($sth, $attrib) = @_;
-    # would normally validate and only fetch known attributes
-    # else pass up to DBI to handle
-		if ( exists $sth->{$attrib} ) {
-			return $sth->{$attrib};
-		}
-    return $sth->SUPER::FETCH($attrib);
-    # return $sth->DBD::_::dr::FETCH($attrib);
+  sub finish {
+    my ($sth) = @_;
+
+    my $rs = $sth->{ado_rowset};
+    $rs->Close if $rs && $rs->State;
+    $sth->{ado_rowset} = undef;
+
+    $sth->SUPER::finish;
+    return 1;
   }
 
-	# Allows adjusting different parameters in the command and connect objects.
 
-	my $change_affect = {
-		ado_commandtimeout	=> 'CommandTimeout'
-	};
+  sub FETCH {
+    my ($sth, $attrib) = @_;
+
+    return $sth->{$attrib} if exists $sth->{$attrib};
+
+    return $sth->SUPER::FETCH( $attrib );
+  }
+
+
+  # Allows adjusting different parameters in the command and connect objects.
+  my $change_affect = {
+    ado_commandtimeout => 'CommandTimeout'
+  };
 
   sub STORE {
     my ($sth, $attrib, $value) = @_;
+
     # would normally validate and only store known attributes
-		if ( exists $sth->{$attrib} ) {
-			if ( exists $change_affect->{$attrib} ) {
-				# Only attempt to change the command if present.
-				if (defined $sth->{ado_comm}) {
-					$sth->{ado_comm}->{$change_affect->{$attrib}} = $value;
-					return if DBD::ADO::Failed( $sth,"Store change $attrib: $value");
-				}
-			}
-			return $sth->{$attrib} = $value;
-		}
-    # else pass up to DBI to handle
-    return $sth->SUPER::STORE($attrib, $value);
-    # return $sth->DBD::_::dr::STORE($attrib, $value);
+    if ( exists $sth->{$attrib} ) {
+      if ( exists $change_affect->{$attrib} ) {
+        # Only attempt to change the command if present.
+        if ( defined $sth->{ado_comm} ) {
+          $sth->{ado_comm}->{$change_affect->{$attrib}} = $value;
+          return if DBD::ADO::Failed( $sth,"Store change $attrib: $value");
+        }
+      }
+      return $sth->{$attrib} = $value;
+    }
+    return $sth->SUPER::STORE( $attrib, $value );
   }
 
-   sub DESTROY { # Statement handle
+
+  sub DESTROY {
     my ($sth) = @_;
-		$sth->trace_msg("<- destroy statement handler\n", 1 );
 
-    # XXX: Necessary? Call finish()? Or is it called already?
-    my $rs = $sth->{ado_rowset};
-#   Carp::carp "Statement handle has active recordset" if defined $rs;
-		$rs->Close ()
-			if (defined $rs
-				and UNIVERSAL::isa($rs, 'Win32::OLE')
-				and ($rs->State != $ado_consts->{ObjectStateEnum}{adStateClosed}));
-		$rs = undef;
-		$sth->{ado_rowset} = undef;
-    $sth->STORE(Active => 0);
-		$sth->trace_msg("-> destroy statement handler\n", 1 );
-
-		$sth = undef;
-		return;
-	} # Statement handle
+    $sth->finish;
+    return;
+  }
 
 }
 
@@ -1595,18 +1533,21 @@ data sources.
 
 =head1 PREREQUISITES
 
+It is recommended that you use recent versions of the following prerequisites:
+
 =over
 
 =item DBI
 
+  http://search.cpan.org/~timb/DBI/
+
 =item Win32::OLE
+
+  http://search.cpan.org/~jdb/Win32-OLE/
 
 =item ADO
 
-It is strongly recommended that you use the latest version of ADO
-(2.1 at the time this was written). You can download it from:
-
-  http://www.microsoft.com/Data/download.htm
+  http://msdn.microsoft.com/data/
 
 =back
 
@@ -1971,6 +1912,12 @@ dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
   David Sussman and Alex Homer
   Wrox
   ISBN 1-861001-83-5
+
+  ADO: ActiveX Data Objects
+  Jason T. Roff
+  O'Reilly
+  ISBN 1-56592-415-0
+  http://www.oreilly.com/catalog/ado/index.html
 
 If there's anything better please let me know.
 
