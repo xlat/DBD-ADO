@@ -12,6 +12,7 @@ lib/DBD/ADO/TypeInfo.pm
 t/01base.t
 t/02simple.t
 t/03dbatt.t
+t/05gi.t
 t/05meth.t
 t/07long.t
 t/09bind.t

@@ -9,7 +9,7 @@
   use strict;
   use vars qw($err $errstr $state $drh $VERSION);
 
-  $VERSION = '2.74';
+  $VERSION = '2.75';
 
 # Copyright (c) 1998, Tim Bunce
 # Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
@@ -41,53 +41,37 @@
         return $drh;
     }
 
+  sub errors {
+    my $Conn = shift;
+    my @Err  = ();
 
-  	sub errors {
-			my $Conn = shift;
-			my $err_ary = [];
-
-			my $lastError = Win32::OLE->LastError;
-			if ($lastError) {
-				push @$err_ary, "\nLasterror:\t " . ($lastError+0) . ": $lastError";
-				$DBD::ADO::err = int(sprintf("%f", $lastError+0));
-			} else {
-					$DBD::ADO::err			= 0;
-					$DBD::ADO::errstr		= undef;
-					$DBD::ADO::state		= undef;
-			}
-
-			return unless ref $Conn;
-			my $Errors = $Conn->Errors();
-			# return unless defined $Errors;
-			if($Errors && $Errors->{Count}) {
-				my $err;
-				foreach $err (Win32::OLE::in($Errors)) {
-	    		next if $err->{Number} == 0; # Skip warnings
-	    		push(@$err_ary, "\n"
-						, qq{\tDescription:\t} . ($err->{Description}||q{})
-	    			, qq{\tHelpContext:\t} . ($err->{HelpContext}||q{})
-						, qq{\tHelpFile:   \t} . ($err->{HelpFile}||q{})
-	    			, qq{\tNativeError:\t} . ($err->{NativeError}||q{})
-						, qq{\tNumber:     \t} . ($err->{Number}||q{})
-						, qq{\tSource:     \t} . ($err->{Source}||q{})
-						, qq{\tSQLState:   \t} . ($err->{SQLState}||q{}));
-				}
-				$DBD::ADO::state = $err->{SQLState}
-					if $err->{SQLState};
-			}
-
-			if ($Errors) {
-				# $DBD::ADO::state = $Errors->SQLState();
-				$Errors->Clear
-			}
-
-			$Conn->Errors->Clear() if $Conn;
-
-		return ($err_ary ? join "\n", @$err_ary : undef);
+    my $lastError = Win32::OLE->LastError;
+    if ( $lastError ) {
+      push @Err, "\nLasterror : " . ( $lastError+0 ) . "\n$lastError";
+      $DBD::ADO::err = int( sprintf('%f', $lastError+0 ) );
+    } else {
+      $DBD::ADO::err    = 0;
+      $DBD::ADO::errstr = undef;
+      $DBD::ADO::state  = undef;
     }
+    return unless ref $Conn;
+    my $Errors = $Conn->Errors;
+
+    if ( $Errors && $Errors->Count ) {
+      for my $err ( Win32::OLE::in( $Errors ) ) {
+        next if $err->Number == 0;  # Skip warnings
+        push @Err, '';
+        push @Err, sprintf "\t%11s : %s", $_, $err->$_ ||'' for qw(
+          Description HelpContext HelpFile NativeError Number Source SQLState);
+        push @Err, '    ';
+        $DBD::ADO::state = $err->SQLState;
+      }
+      $Errors->Clear;
+    }
+    join "\n", @Err;
+  }
 
 }
-
 
 # ADO.pm lexically scoped constants
 #my $ado_consts;
@@ -194,7 +178,7 @@ my %connect_options;
 	local $Win32::OLE::Warn = 0;
 	my $conn = Win32::OLE->new('ADODB.Connection');
 	my $lastError = Win32::OLE->LastError;
-	return DBI::set_err($drh, $DBD::ADO::err,
+	return $drh->set_err( $DBD::ADO::err || -1,
 		"Can't create 'ADODB.Connection': $lastError")
 	    if $lastError;
 
@@ -266,7 +250,7 @@ my %connect_options;
 	$drh->trace_msg("->> Open ADO connection using $cdsn\n", 1);
 	$conn->Open ($cdsn, $user, $auth);
 	$lastError = DBD::ADO::errors($conn);
-	return DBI::set_err( $drh, $DBD::ADO::err,
+	return $drh->set_err( $DBD::ADO::err || -1,
 		  "Can't connect to '$dsn': $lastError")
 	    if $lastError;
 
@@ -277,7 +261,7 @@ my %connect_options;
 
 	$conn->{Attributes} = $att;
 	$lastError = DBD::ADO::errors($conn);
-	return DBI::set_err( $conn, $DBD::ADO::err,
+	return $drh->set_err( $DBD::ADO::err || -1,
 			"Failed setting CommitRetaining: $lastError")
 		if $lastError;
 
@@ -322,7 +306,7 @@ my %connect_options;
  	if ($auto) {
 		$conn->BeginTrans;
 		$lastError = DBD::ADO::errors($conn);
-		return DBI::set_err( $this, $DBD::ADO::err,
+		return $drh->set_err( $DBD::ADO::err || -1,
 			"Begin Transaction Failed: $lastError")
 		if $lastError;
 	}
@@ -351,7 +335,7 @@ my %connect_options;
 				$conn->RollbackTrans unless $auto
 					and not $self->{ado_provider_support_auto_commit};
 			my $lastError = DBD::ADO::errors($conn);
-			return DBI::set_err( $self, $DBD::ADO::err, "Failed to Destory: $lastError")
+			return $self->set_err( $DBD::ADO::err || -1, "Failed to Destory: $lastError")
 				if $lastError;
 			}
 		}
@@ -414,7 +398,7 @@ my @sql_types_supported = ();
 				$dbh->{ado_conn}->{State} & $ado_consts->{adStateOpen}) {
 					$dbh->{ado_conn}->RollbackTrans;
 					my $lastError = DBD::ADO::errors($dbh->{ado_conn});
-					return DBI::set_err( $dbh, $DBD::ADO::err,
+					return $dbh->set_err( $DBD::ADO::err || -1,
 						"Failed to Rollback Trans: $lastError")
 					if $lastError;
 			}
@@ -432,7 +416,7 @@ my @sql_types_supported = ();
 				# does not start another transaction.
 				$conn->{Attributes} = 0;
 				my $lastError = DBD::ADO::errors($conn);
-				return DBI::set_err( $conn, $DBD::ADO::err,
+				return $dbh->set_err( $DBD::ADO::err || -1,
 						"Failed setting CommitRetaining: $lastError") #-2147168242
 				if $lastError and $lastError !~ m/-2147168242/;
 
@@ -446,7 +430,7 @@ my @sql_types_supported = ();
 					not $dbh->{ado_provider_support_auto_commit};
 
 				$lastError = DBD::ADO::errors($conn);
-				return $dbh->DBI::set_err( $DBD::ADO::err, "Failed to execute rollback: $lastError")
+				return $dbh->set_err( $DBD::ADO::err || -1, "Failed to execute rollback: $lastError")
 					if $lastError and $lastError !~ m/-2147168242/;
 				# Provider error about transaction not started.  Ignore message,
 				# clear error codes.
@@ -475,7 +459,7 @@ my @sql_types_supported = ();
 
 				$dbh->{ado_conn}->CommitTrans;
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
-				return DBI::set_err( $dbh, $DBD::ADO::err, "Failed to CommitTrans: $lastError")
+				return $dbh->set_err( $DBD::ADO::err || -1, "Failed to CommitTrans: $lastError")
 					if $lastError;
 			}
 		}
@@ -507,26 +491,26 @@ my @sql_types_supported = ();
 
 			my $comm = Win32::OLE->new('ADODB.Command');
 			my $lastError = Win32::OLE->LastError;
-			return DBI::set_err($dbh, $DBD::ADO::err,
+			return $dbh->set_err( $DBD::ADO::err || -1,
 				"Can't create 'object ADODB.Command': $lastError")
 	    if $lastError;
 
 			$comm->{ActiveConnection} = $conn;
 			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($dbh, $DBD::ADO::err,
+			return $dbh->set_err( $DBD::ADO::err || -1,
 				"Unable to set ActiveConnection 'ADODB.Command': $lastError")
 	    if $lastError;
 
 			$comm->{CommandText} = $statement;
 			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($dbh, $DBD::ADO::err,
+			return $dbh->set_err( $DBD::ADO::err || -1,
 				"Unable to set CommandText 'ADODB.Command': $lastError")
 	    if $lastError;
 
 			my $ct = $attribs->{CommandType}? $attribs->{CommandType}: "adCmdText";
 			$comm->{CommandType} = $ado_consts->{$ct};
 			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($dbh, $DBD::ADO::err,
+			return $dbh->set_err( $DBD::ADO::err || -1,
 				"Unable to set command type 'ADODB.Command': $lastError")
 	    if $lastError;
 
@@ -585,7 +569,7 @@ my @sql_types_supported = ();
 
 			$comm->{CommandTimeout} = $sth->{ado_commandtimeout};
 			$lastError = DBD::ADO::errors($conn);
-			return $dbh->DBI::set_err( $DBD::ADO::err,
+			return $dbh->set_err( $DBD::ADO::err || -1,
 				"Unable to set CommandText 'ADODB.Command': $lastError")
 	    if $lastError;
 
@@ -928,13 +912,13 @@ my @sql_types_supported = ();
 
 		my $RecSet = $conn->OpenSchema( $ado_consts->{$QueryType}, $Criteria );
 		my $lastError = DBD::ADO::errors($conn);
-		return DBI::set_err($dbh, $DBD::ADO::err,
+		return $dbh->set_err( $DBD::ADO::err || -1,
 			"Error occurred with call to OpenSchema ($QueryType): $lastError")
 				if $lastError;
 
 		$RecSet->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION';
 		$lastError = DBD::ADO::errors($conn);
-		return DBI::set_err($dbh, $DBD::ADO::err,
+		return $dbh->set_err( $DBD::ADO::err || -1,
 			"Error occurred defining sort order : $lastError")
 				if $lastError;
 
@@ -1005,13 +989,13 @@ my @sql_types_supported = ();
 
 		my $RecSet = $conn->OpenSchema( $ado_consts->{$QueryType}, \@Criteria );
 		my $lastError = DBD::ADO::errors($conn);
-		return DBI::set_err($dbh, $DBD::ADO::err,
+		return $dbh->set_err( $DBD::ADO::err || -1,
 			"Error occurred with call to OpenSchema ($QueryType): $lastError")
 	   if $lastError;
 
 		$RecSet->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL';
 		$lastError = DBD::ADO::errors($conn);
-		return DBI::set_err($dbh, $DBD::ADO::err,
+		return $dbh->set_err( $DBD::ADO::err || -1,
 			"Error occurred defining sort order : $lastError")
 	   if $lastError;
 
@@ -1052,13 +1036,13 @@ my @sql_types_supported = ();
 
 		my $RecSet = $conn->OpenSchema( $ado_consts->{$QueryType}, $Criteria );
 		my $lastError = DBD::ADO::errors($conn);
-		return DBI::set_err($dbh, $DBD::ADO::err,
+		return $dbh->set_err( $DBD::ADO::err || -1,
 			"Error occurred with call to OpenSchema ($QueryType): $lastError")
 			if $lastError;
 
 		$RecSet->{Sort} = 'PK_TABLE_CATALOG, PK_TABLE_SCHEMA, PK_TABLE_NAME, FK_TABLE_CATALOG, FK_TABLE_SCHEMA, FK_TABLE_NAME';
 		$lastError = DBD::ADO::errors($conn);
-		return DBI::set_err($dbh, $DBD::ADO::err,
+		return $dbh->set_err( $DBD::ADO::err || -1,
 			"Error occurred defining sort order : $lastError")
 			if $lastError;
 
@@ -1256,7 +1240,7 @@ my @sql_types_supported = ();
 			my $oLRec =
 				$conn->OpenSchema($ado_consts->{adSchemaProviderTypes});
 				my $lastError = DBD::ADO::errors($conn);
-				return $dbh->DBI::set_err($DBD::ADO::err, "OpenSchema error: $lastError") if $lastError;
+				return $dbh->set_err( $DBD::ADO::err || -1, "OpenSchema error: $lastError") if $lastError;
 
 			my $ado_fields = [ Win32::OLE::in($oLRec->Fields) ];
 			my $ado_info		= [ map { $_->Name } @$ado_fields ];
@@ -1363,7 +1347,7 @@ my @sql_types_supported = ();
 
 		my $ado_consts = $dbh->{ado_consts};
 
-			return $dbh->DBI::set_err( -1,
+			return $dbh->set_err( $DBD::ADO::err || -1,
 				"convert_ado_to_odbc: call without any attributes.")
 			unless $AdoType;
 
@@ -1414,7 +1398,7 @@ my @sql_types_supported = ();
 		Carp::croak qq{_open_schema called with dbh defined} unless $dbh;
 
 		unless (exists $ado_consts->{$var}) {
-			return DBI::set_err($dbh, $DBD::ADO::err,
+			return $dbh->set_err( $DBD::ADO::err || -1,
 				"OpenSchema called with unknown parameter: $var");
 		}
 		my $crit = \@crit if @crit;
@@ -1423,7 +1407,7 @@ my @sql_types_supported = ();
 # 		$conn->OpenSchema($ado_consts->{$var});
  			$conn->OpenSchema($ado_consts->{$var}, $crit);
 		my $lastError = DBD::ADO::errors($conn);
-		return $dbh->DBI::set_err($DBD::ADO::err, "OpenSchema error: : $lastError")
+		return $dbh->set_err( $DBD::ADO::err || -1, "OpenSchema error: : $lastError")
 			if $lastError;
 
 		my $sth = _rs_sth_prepare( $dbh, $oLRec );
@@ -1554,7 +1538,7 @@ my @sql_types_supported = ();
 					# does not start another transaction.
 					$conn->{Attributes} = 0;
 					my $lastError = DBD::ADO::errors($conn);
-					return DBI::set_err( $conn, $DBD::ADO::err,
+					return $dbh->set_err( $DBD::ADO::err || -1,
 							"Failed setting CommitRetaining: $lastError") #-2147168242
 					if $lastError and $lastError !~ m/-2147168242/;
 
@@ -1568,7 +1552,7 @@ my @sql_types_supported = ();
 						not $dbh->{ado_provider_support_auto_commit};
 
 					$lastError = DBD::ADO::errors($conn);
-					return $dbh->DBI::set_err( $DBD::ADO::err, "Failed to execute rollback: $lastError")
+					return $dbh->set_err( $DBD::ADO::err || -1, "Failed to execute rollback: $lastError")
 						if $lastError and $lastError !~ m/-2147168242/;
 					# Provider error about transaction not started.  Ignore message,
 					# clear error codes.
@@ -1652,12 +1636,12 @@ my @sql_types_supported = ();
         1,
         "");
       my $lastError = DBD::ADO::errors( $conn );
-      return $sth->DBI::set_err( $DBD::ADO::err,
+      return $sth->set_err( $DBD::ADO::err || -1,
         "Unable to CreateParameter: $lastError") if $lastError;
 
       $comm->Parameters->Append( $Parameter );
       $lastError = DBD::ADO::errors( $conn );
-      return $sth->DBI::set_err( $DBD::ADO::err,
+      return $sth->set_err( $DBD::ADO::err || -1,
         "Append parameter failed : $lastError") if $lastError;
     }
     $sth->STORE('NUM_OF_PARAMS', $Cnt );
@@ -1673,7 +1657,7 @@ my @sql_types_supported = ();
 
       my $param_cnt = $sth->FETCH('NUM_OF_PARAMS') || _refresh( $sth );
 
-			return $sth->set_err( -1,
+			return $sth->set_err( $DBD::ADO::err || -1,
 				"Bind Parameter $pNum outside current range of $param_cnt.")
 	    if ($pNum > $param_cnt or $pNum < 1);
 
@@ -1751,7 +1735,7 @@ my @sql_types_supported = ();
 			my $rs;
 			my $p = $comm->Parameters;
 			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($sth, $DBD::ADO::err,
+			return $sth->set_err( $DBD::ADO::err || -1,
 				"Execute Parameters failed 'ADODB.Command': $lastError")
 	    if $lastError and $DBD::ADO::err ne NOT_SUPPORTED;
 
@@ -1812,7 +1796,7 @@ my @sql_types_supported = ();
 			if ( $UseRecordSet ) {
 				$rs = Win32::OLE->new('ADODB.RecordSet');
 				$lastError = Win32::OLE->LastError;
-				return $sth->DBI::set_err(1,
+				return $sth->set_err( $DBD::ADO::err || -1,
 					"Can't create 'object ADODB.RecordSet': $lastError")
 				if $lastError;
 
@@ -1837,20 +1821,28 @@ my @sql_types_supported = ();
 				# Execute the statement, get a recordset in return.
 				# $rs = $comm->Execute($rows);
 				$lastError = DBD::ADO::errors($conn);
-				return $sth->DBI::set_err( $DBD::ADO::err,
+				return $sth->set_err( $DBD::ADO::err || -1,
 						"Can't execute statement '$sql': $lastError")
-				if $DBD::ADO::err;
+				if $lastError;
 			} else {
 				# Execute the command.
 				# Execute the statement, get a recordset in return.
 				$rs = $comm->Execute($rows);
 				$lastError = DBD::ADO::errors($conn);
-				return $sth->DBI::set_err( $DBD::ADO::err,
+				return $sth->set_err( $DBD::ADO::err || -1,
 						"Can't execute statement '$sql': $lastError")
-				if $DBD::ADO::err;
+				if $lastError;
 			}
-
-			$sth->{ado_fields} = my $ado_fields = [ Win32::OLE::in($rs->Fields) ];
+      my $ado_fields = [];
+      # some providers close the rs, e.g. after DROP TABLE
+      if ( defined $rs and $rs->State ) {
+			  $ado_fields = [ Win32::OLE::in($rs->Fields) ];
+			  $lastError = DBD::ADO::errors($conn);
+			  return $sth->set_err( $DBD::ADO::err || -1,
+					"Can't enumerate fields: $lastError")
+			  if $lastError;
+      }
+      $sth->{ado_fields} = $ado_fields;
 			my $num_of_fields = @$ado_fields;
 
 			if ($num_of_fields == 0) {	# assume non-select statement
@@ -1860,7 +1852,7 @@ my @sql_types_supported = ();
 						if $sth->{ado_dbh}->{AutoCommit}
 							and $sth->{ado_dbh}->{ado_provider_support_auto_commit};
 					$lastError = DBD::ADO::errors($conn);
-					return DBI::set_err( $sth, $DBD::ADO::err,
+					return $sth->set_err( $DBD::ADO::err || -1,
 							"Execute: Commit failed: $lastError")
 						if $lastError;
 
@@ -1887,9 +1879,9 @@ my @sql_types_supported = ();
 					$sth->trace_msg( "  changing the CacheSize using RowCacheSize: $rowcache" );
 					$rs->CacheSize( $rowcache ) unless $rowcache == $currowcache;
 					$lastError = DBD::ADO::errors($conn);
-					return $sth->DBI::set_err( $DBD::ADO::err,
+					return $sth->set_err( $DBD::ADO::err || -1,
 							"  Unable to change CacheSize to RowCacheSize : $rowcache : $lastError")
-					if $DBD::ADO::err;
+					if $lastError;
 				warn "Changed CacheSize\n";
 			}
 
@@ -1946,10 +1938,10 @@ my @sql_types_supported = ();
 			my $ado_consts = $sth->{ado_dbh}->{ado_consts};
 
 			# return undef unless $sth->FETCH('Active');
-			return $sth->DBI::set_err( -900,
+			return $sth->set_err( -900,
 		  	"statement handle not marked as Active.") unless $sth->FETCH('Active');
 
-			return $sth->DBI::set_err( -905,
+			return $sth->set_err( -905,
 		  	"Recordset Undefined, execute statement not called?") unless $rs;
 
 			return undef if $rs->EOF;
@@ -1963,7 +1955,7 @@ my @sql_types_supported = ();
 			return undef if $rs->{EOF};
 
 			my $lastError = DBD::ADO::errors($sth->{ado_conn});
-			return DBI::set_err( $sth, $DBD::ADO::err,
+			return $sth->set_err( $DBD::ADO::err || -1,
 		  	"Fetch failed: $lastError")
 	    if $lastError;
 
@@ -2047,7 +2039,7 @@ my @sql_types_supported = ();
 						if (defined $sth->{ado_comm}) {
 							$sth->{ado_comm}->{$change_affect->{$attrib}} = $value;
 							my $lastError = DBD::ADO::errors($sth->{ado_conn});
-							return $sth->DBI::set_err( $DBD::ADO::err,
+							return $sth->set_err( $DBD::ADO::err || -1,
 								"Store change $attrib: $value: $lastError")
 							if $lastError;
 						}
@@ -2083,10 +2075,7 @@ my @sql_types_supported = ();
 		} # Statement handle
 }
 
-
-
 1;
-__END__
 
 =head1 NAME
 
@@ -2308,6 +2297,15 @@ Tim Bunce and Phlip. With many thanks to Jan Dubois and Jochen Wiedmann
 for additions, debuggery and general help.
 Special thanks to Thomas Lowery, who maintained this module 2001-2003.
 Current maintainer is Steffen Goeldner.
+
+=head1 SUPPORT
+
+This software is supported via the dbi-users mailing list.
+For more information and to keep informed about progress you can join the
+mailing list by sending a message to dbi-users-help@perl.org
+
+Please post details of any problems (or changes you needed to make) to
+dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
 
 =head1 SEE ALSO
 

@@ -1,5 +1,12 @@
 
-Changes Version 2.74: 2003-10-12
+2003-10-19  2.75
+
+	Improved error handling.
+
+	Moved get_info() tests from t/15func.t into t/05gi.t and
+	added diagnosis output.
+
+2003-10-12  2.74
 
 	Improved prepare/bind_param/execute for providers which
 	fail to parse placeholders correctly.
@@ -8,7 +15,7 @@ Changes Version 2.74: 2003-10-12
 
 	Rearranged some tests.
 
-Changes Version 2.73: 2003-10-05
+2003-10-05  2.73
 
 	Modified t/17conn.t to avoid an error message on stderr.
 
@@ -35,7 +42,7 @@ Changes Version 2.73: 2003-10-05
 	Fixed warning 'unexpected =item directive in paragraph 292' at
 	lib/DBD/ADO.pm line 2301.
 
-Changes Version 2.72: 2003-09-03
+2003-09-03  2.72
 
 	Moved DBD::ADO::TypeInfo from DBD/ADO.pm to DBD/ADO/TypeInfo.pm.
 
@@ -44,11 +51,11 @@ Changes Version 2.72: 2003-09-03
 	Fixed warning 'Use of uninitialized value in string eq' at
 	t/02simple.t line 54.
 
-Changes Version 2.71: 2003-08-31
+2003-08-31  2.71
 
 	New maintainer: Steffen Goeldner <sgoeldner@cpan.org>.
 
-Changes Version 2.7: Thu Aug 21 23:10:50 EDT 2003
+2003-08-22  2.70
 
 	Bug fix from Yimin Zheng regarding undef/null values passed as
 	parameters to bind_param and/or execute
@@ -64,10 +71,11 @@ Changes Version 2.7: Thu Aug 21 23:10:50 EDT 2003
 	Did minor clean up in the test and warning messages for uninitialized
 	values.
 
-Changes Version 2.6:  So what happened to the notes for 2.6?
+2002-11-09  2.60
 
+	So what happened to the notes for 2.6?
 
-Changes Version 2.5: Mon  Apr 8, 2002  23:00:39
+2002-04-14  2.50
 
 	Bug fix from Jacqui Caren <jacqui.caren@ig.co.uk>, apply to bind image.
 
@@ -87,11 +95,11 @@ Changes Version 2.5: Mon  Apr 8, 2002  23:00:39
 
 	Added more tests.
 
-Changes Version 2.4: Tue Oct 23 23:25:42 EDT 2001
+2001-10-24  2.40
 
-	Patch for supporting primary_key_info from Steffen Goeldner <sgoeldner@cpan.org>
+	Patch for supporting primary_key_info from Steffen Goeldner
 		Thanks Steffen!
-	Bug in function call to openschema from Steffen Goeldner <sgoeldner@cpan.org>
+	Bug in function call to openschema from Steffen Goeldner
 		Thanks Steffen!
 	Added support for CursorType.
 	Fixed error messages to return more meaningful numbers.
@@ -99,14 +107,13 @@ Changes Version 2.4: Tue Oct 23 23:25:42 EDT 2001
 	Added more documentation.
 	Modified most of the tests to use Test::More.
 
-Changes Version 2.1: Sat May 26 07:51:19 EDT 2001
+2001-05-29  2.10
 
 	First CPAN release apart from DBI.
 	Version number correction.
 	Patch from Simon Oliver:  Warning messages from undefined values.
 
-  New maintainer: Thomas Lowery <tlowery@stlowery.com>
-  When emailing, make sure to include ADO in the subject line.
+	New maintainer: Thomas Lowery
 
 -------------------------------------------------------------------------------
 

@@ -1,7 +1,9 @@
 NAME
+
     DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
 
 SYNOPSIS
+
       use DBI;
 
       $dbh = DBI->connect("dbi:ADO:dsn", $user, $passwd);
@@ -11,22 +13,24 @@ SYNOPSIS
             dbi:ADO:dsn;ConnectTimeout=60 (your number)
             or include both ConnectTimeout and CommandTimeout.
 
-            The dsn may be a standard ODBC dsn or a dsn-less. 
+            The dsn may be a standard ODBC dsn or a dsn-less.
             See the ADO documentation for more information on
             the dsn-less connection.
 
       # See the DBI module documentation for full details
 
 DESCRIPTION
+
     The DBD::ADO module supports ADO access on a Win32 machine. DBD::ADO is
     written to support the standard DBI interface to data sources.
 
 Connection
+
       $dbh = DBI->connect("dbi:ADO:dsn", $user, $passwd, $attribs);
 
             Connection supports dsn and dsn-less calls.
 
-            $dbh = DBI->connect( "dbi:ADO:File Name=oracle.udl", 
+            $dbh = DBI->connect( "dbi:ADO:File Name=oracle.udl",
                     $user, $passwd, {RaiseError => [0|1], PrintError => [0|1],
                     AutoCommit => [0|1]});
 
@@ -45,9 +49,10 @@ Connection
             information when setting any of these attributes.
 
 Functions support
+
             Using the standard DBI function call
                     $dbh->func( arguments, 'function name')
-        
+
             You may access the following functions: (case sensitive)
                     OpenSchema
 
@@ -63,6 +68,7 @@ Functions support
                             my $sth = $dbh->func( 'adSchemaProviderTypes', 'OpenSchema' );
 
 Enhanced DBI Methods
+
   prepare
 
     The prepare methods allows attributes: (from DBI)
@@ -81,7 +87,7 @@ Enhanced DBI Methods
                                     my $col = $sth2->fetchrow_hashref;
                                     ...
                             }
-                    It may be necessary to prepare the statement using CursorType => adOpenStatic. 
+                    It may be necessary to prepare the statement using CursorType => adOpenStatic.
 
                     Changing the CursorType is a solution to the following problem.
                             Can't execute statement 'select * from authors':
@@ -106,10 +112,10 @@ Enhanced DBI Methods
 
             $sth = $dbh->table_info(\%attr);
 
-            $sth = $dbh->table_info({ 
-                    TABLE_TYPE => 'VIEW', 
-                    ADO_Columns => 1, 
-                    Trim_Catalog => 0, 
+            $sth = $dbh->table_info({
+                    TABLE_TYPE => 'VIEW',
+                    ADO_Columns => 1,
+                    Trim_Catalog => 0,
                     Filter => q{TABLE_NAME LIKE 'C%'},
             });
 
@@ -117,7 +123,7 @@ Enhanced DBI Methods
     about tables and views that exist in the database. By default the handle
     contains the columns described in the DBI documentation:
 
-            TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS  
+            TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
 
     ADO_Columns
     Additional ADO-only fields will be included if the ADO_Columns attribute
@@ -158,7 +164,7 @@ Enhanced DBI Methods
 
     The Fieldname must be one of the ADO 'TABLES Rowset' column names:
 
-            TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION, 
+            TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION,
             TABLE_GUID, TABLE_PROPID, DATE_CREATED, DATE_MODIFIED
 
     Value is the value with which you will compare the field values (for
@@ -181,26 +187,39 @@ Enhanced DBI Methods
             @names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
 
 Warnings
-            Support for type_info_all is supported, however, you're not using
-            a true OLE DB provider (using the MS OLE DB -> ODBC), the first
-            hash may not be the "best" solution for the data type.
-            adSchemaProviderTypes does provide for a "best match" column, however
-            the MS OLE DB -> ODBC provider does not support the best match.
-            Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
+
+    Support for type_info_all is supported, however, you're not using
+    a true OLE DB provider (using the MS OLE DB -> ODBC), the first
+    hash may not be the "best" solution for the data type.
+    adSchemaProviderTypes does provide for a "best match" column, however
+    the MS OLE DB -> ODBC provider does not support the best match.
+    Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
 
 ADO
+
     It is strongly recommended that you use the latest version of ADO (2.1
     at the time this was written). You can download it from:
 
       http://www.microsoft.com/Data/download.htm
 
 AUTHORS
+
     Tim Bunce and Phlip. With many thanks to Jan Dubois and Jochen Wiedmann
     for additions, debuggery and general help.
     Special thanks to Thomas Lowery, who maintained this module 2001-2003.
     Current maintainer is Steffen Goeldner.
 
+SUPPORT
+
+    This software is supported via the dbi-users mailing list.
+    For more information and to keep informed about progress you can join the
+    mailing list by sending a message to dbi-users-help@perl.org
+
+    Please post details of any problems (or changes you needed to make) to
+    dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
+
 SEE ALSO
+
     ADO Reference book: ADO 2.0 Programmer's Reference, David Sussman and
     Alex Homer, Wrox, ISBN 1-861001-83-5. If there's anything better please
     let me know.

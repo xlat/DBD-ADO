@@ -13,7 +13,7 @@ my ($pf, $sf);
 
 use Test::More;
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 48;
+	plan tests => 42;
 } else {
 	plan skip_all => 'Cannot test without DB info';
 }
@@ -35,26 +35,11 @@ my $sth;
 # 	printf "%s=%d\n", $_, &{"DBI::$_"};
 # }
 
-my $get_info = {
-	  SQL_DBMS_NAME	=> 17
-	, SQL_DBMS_VER	=> 18
-	, SQL_IDENTIFIER_QUOTE_CHAR	=> 29
-	, SQL_CATALOG_NAME_SEPARATOR	=> 41
-	, SQL_CATALOG_LOCATION	=> 114
-};
-
 # Ping
  eval {
 	 ok( $dbh->ping(), "Testing Ping" );
  };
 ok ( !$@, "Ping Tested" );
-
-# Get Info
- eval {
-	 $sth = $dbh->get_info();
- };
-ok ($@, "Call to get_info with 0 arguements, error expected: $@" );
-$sth = undef;
 
 # Table Info
  eval {
@@ -120,10 +105,8 @@ eval { $dbh->quote_identifier() };
 
 ok( $@,"Call to quote_identifier() with 0 arguments, error expected: $@ ");
 
-#	, SQL_IDENTIFIER_QUOTE_CHAR	=> 29
-#	, SQL_CATALOG_NAME_SEPARATOR	=> 41
-my $qt  = $dbh->get_info( $get_info->{SQL_IDENTIFIER_QUOTE_CHAR} );
-my $sep = $dbh->get_info( $get_info->{SQL_CATALOG_NAME_SEPARATOR} );
+my $qt  = $dbh->get_info( 29 );  # SQL_IDENTIFIER_QUOTE_CHAR
+my $sep = $dbh->get_info( 41 );  # SQL_CATALOG_NAME_SEPARATOR
 
 my $cmp_str = qq{${qt}link${qt}${sep}${qt}schema${qt}${sep}${qt}table${qt}};
 is( $dbh->quote_identifier( "link", "schema", "table" )
@@ -134,26 +117,6 @@ is( $dbh->quote_identifier( "link", "schema", "table" )
 # Test ping
 
 ok ($dbh->ping, "Ping the current connection ..." );
-
-# Test Get Info.
-
-#	SQL_KEYWORDS
-#	SQL_CATALOG_TERM
-#	SQL_DATA_SOURCE_NAME
-#	SQL_DBMS_NAME
-#	SQL_DBMS_VERSION
-#	SQL_DRIVER_NAME
-#	SQL_DRIVER_VER
-#	SQL_PROCEDURE_TERM
-#	SQL_SCHEMA_TERM
-#	SQL_TABLE_TERM
-#	SQL_USER_NAME
-
-foreach my $info (sort keys %$get_info)
-{
-	my $type =  $dbh->get_info($get_info->{$info});
-	ok( defined $type,  "get_info($info) ($get_info->{$info}) $type" );
-}
 
 # Test Table Info
 $sth = $dbh->table_info( undef, undef, undef );
