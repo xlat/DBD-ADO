@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -42,7 +42,7 @@ for ( @$val ) {
   is( $val2, $_->[1],"quote on $val1 returned $val2");
 }
 
-my $ti = ADOTEST::get_type_for_column( $dbh,'A');
+my $ti = DBD_TEST::get_type_for_column( $dbh,'A');
 is( $dbh->quote( 1, $ti->{DATA_TYPE} ), 1,"quote( 1, $ti->{DATA_TYPE} )");
 
 ok( $dbh->disconnect,'Disconnect');

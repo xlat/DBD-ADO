@@ -5,12 +5,12 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
-my $tbl = $ADOTEST::table_name;
-my @col = sort keys %ADOTEST::TestFieldInfo;
+my $tbl = $DBD_TEST::table_name;
+my @col = sort keys %DBD_TEST::TestFieldInfo;
 my $dat = [
   [ 1,'A123'  ,'A' x 12,'1998-05-13']
 , [ 2,'B12'   ,'B' x  2,'1998-05-14']
@@ -31,11 +31,11 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
    $dbh->{ChopBlanks} = 1;
 pass('Database connection created');
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 for my $i ( 0..$#col ) {
   ok( $dbh->do( $_ ),"do $i: $_") for "DELETE FROM $tbl";
-  my $ti  = ADOTEST::get_type_for_column( $dbh, $col[$i] );
+  my $ti  = DBD_TEST::get_type_for_column( $dbh, $col[$i] );
   for ( @$dat ) {
     my $v = $dbh->quote( $_->[$i], $ti->{DATA_TYPE} );
     ok( $dbh->do( $_ ),"do $i: $_") for "INSERT INTO $tbl( $col[$i] ) VALUES( $v )";

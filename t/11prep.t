@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -20,7 +20,7 @@ pass('Simple prepare/execute/finish tests');
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
-my $tbl = $ADOTEST::table_name;
+my $tbl = $DBD_TEST::table_name;
 
 {
   local ($dbh->{PrintError}, $dbh->{RaiseError}, $dbh->{Warn});

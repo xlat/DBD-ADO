@@ -10,7 +10,7 @@ use DBI();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 8;
+  plan tests => 9;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -22,7 +22,7 @@ pass('Database connection created');
 
 my $Cxn = $dbh->{ado_conn};
 
-ok( $Cxn,"ADO Connection object: $Cxn");
+ok( $Cxn,"Connection object: $Cxn");
 
 print "\n# Connection properties:\n";
 printf "#   %-20s %s\n", $_, $Cxn->{$_} ||'undef'
@@ -30,7 +30,7 @@ printf "#   %-20s %s\n", $_, $Cxn->{$_} ||'undef'
 
 my $Properties = $Cxn->Properties;
 
-ok( $Properties,"ADO Connection Properties Collection: $Properties");
+ok( $Properties,"Connection Properties Collection: $Properties");
 
 print "\n# Connection Properties Collection:\n";
 printf "#   %-45s %s\n", $_->Name, $_->Value ||'undef'
@@ -44,6 +44,6 @@ ok( $dbh->disconnect,'Disconnect');
 
 ok(!$dbh->ping,'Ping');
 
-# XXX: ok(!$dbh->{Active},'Active');
+ok(!$dbh->{Active},'Active');
 #Connection open, destroy at t\02cxn.t line 0
 #        (in cleanup) Can't call method "State" on unblessed reference at F:/tmp/DBD-ADO-2.77/blib/lib/DBD/ADO.pm line 1549.

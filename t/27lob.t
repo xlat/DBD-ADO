@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI qw(:sql_types);
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -41,7 +41,7 @@ my $tests = @test_sets * $tests_per_set;
 # Normal  value 8 (to test 64KB threshold well)
 my $sz = 8;
 
-my $tbl = $ADOTEST::table_name;
+my $tbl = $DBD_TEST::table_name;
 
 
 run_long_tests( @$_ ) for @test_sets;
@@ -50,7 +50,7 @@ sub run_long_tests {
   my ($tn2, $type2) = @_;
   my ($sth, $p1, $row);
   my $LongReadLen;
-  my $type1 = ADOTEST::get_type_for_column( $dbh,'A')->{DATA_TYPE};
+  my $type1 = DBD_TEST::get_type_for_column( $dbh,'A')->{DATA_TYPE};
 
 # relationships between these lengths are important # e.g.
 my $val0 = ("0\177x\0X"  x 2048) x (1    );  # 10KB  < 64KB
@@ -70,7 +70,7 @@ warn "val1 is <  64KB : $len1\n"          if $len1 <  65535;
 warn "val2 is >= $val1: $len2 >= $len1\n" if $len2 >= $len1;
 
 
-if (!ADOTEST::tab_long_create( $dbh, $type2 ) ) {
+if (!DBD_TEST::tab_long_create( $dbh, $type2 ) ) {
   warn "Unable to create test table for '$tn2' data ($DBI::err). Tests skipped.\n";
   ok(0) for 1..$tests_per_set;
   return;

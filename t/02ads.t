@@ -6,19 +6,14 @@ use strict;
 use warnings;
 use DBI();
 
-use Test::More;
+use Test::More tests => 2;
 
-if (defined $ENV{DBI_DSN}) {
-  plan tests => 2;
-} else {
-  plan skip_all => 'Cannot test without DB info';
-}
 
-pass('ADO data sources tests');
+pass('Data sources tests');
 
 my @ds = DBI->data_sources('ADO');
 
-print "\n# ADO data sources:\n";
+print "\n# Data sources:\n";
 print '# ', $_, "\n" for @ds;
 
-pass('ADO data sources tested');
+pass('Data sources tested');

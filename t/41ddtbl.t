@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -20,9 +20,9 @@ pass('Table info tests');
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
-my $tbl = $ADOTEST::table_name;
+my $tbl = $DBD_TEST::table_name;
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 {
   my @names = qw(TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS);
   my $sth = $dbh->table_info;
@@ -118,30 +118,30 @@ $sth = undef;
 # Test Table Info
 $sth = $dbh->table_info( undef, undef, undef );
 ok( defined $sth,'table_info( undef, undef, undef ) tested');
-ADOTEST::dump_results( $sth );
+DBD_TEST::dump_results( $sth );
 $sth = undef;
 
 $sth = $dbh->table_info( undef, undef, undef,'VIEW');
 ok( defined $sth, q(table_info( undef, undef, undef,'VIEW') tested) );
-ADOTEST::dump_results( $sth );
+DBD_TEST::dump_results( $sth );
 $sth = undef;
 
 # Test Table Info Rule 19a
 $sth = $dbh->table_info('%','','');
 ok( defined $sth, q(table_info('%','','') tested) );
-ADOTEST::dump_results( $sth );
+DBD_TEST::dump_results( $sth );
 $sth = undef;
 
 # Test Table Info Rule 19b
 $sth = $dbh->table_info('','%','');
 ok( defined $sth, q(table_info('','%','') tested) );
-ADOTEST::dump_results( $sth );
+DBD_TEST::dump_results( $sth );
 $sth = undef;
 
 # Test Table Info Rule 19c
 $sth = $dbh->table_info('','','','%');
 ok( defined $sth, q(table_info('','','','%') tested) );
-ADOTEST::dump_results( $sth );
+DBD_TEST::dump_results( $sth );
 $sth = undef;
 
 # Test to see if this database contains any of the defined table types.
@@ -152,7 +152,7 @@ if ( $sth ) {
   for my $type ( sort keys %$ref ) {
     my $sth = $dbh->table_info( undef, undef, undef, $type );
     ok( defined $sth,"table_info( undef, undef, undef, $type ) tested");
-    ADOTEST::dump_results( $sth );
+    DBD_TEST::dump_results( $sth );
   }
 }
 $sth = undef;

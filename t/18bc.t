@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -20,9 +20,9 @@ pass('Bind column tests');
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
-my $tbl = $ADOTEST::table_name;
+my $tbl = $DBD_TEST::table_name;
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 $dbh->{AutoCommit} = 0;
 

@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -22,9 +22,9 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
    $dbh->{PrintError} = 0;
 pass('Database connection created');
 
-my $tbl = $ADOTEST::table_name;
+my $tbl = $DBD_TEST::table_name;
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 eval { $dbh->quote_identifier };
 ok( $@,"Call to quote_identifier with 0 arguments, error expected: $@");

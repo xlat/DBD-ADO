@@ -5,12 +5,12 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 21;
+  plan tests => 29;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -20,19 +20,37 @@ pass('Timeout tests');
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
+my $tbl = $DBD_TEST::table_name;
+
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+
+is( $dbh->{ado_commandtimeout}, 30,'dbh ado_commandtimeout');
+$dbh->{ado_commandtimeout} = 20;
+is( $dbh->{ado_commandtimeout}, 20,'dbh ado_commandtimeout');
+is( $dbh->{ado_conn}{CommandTimeout}, 20,'ADO Connection CommandTimeout');
+
+my $sth = $dbh->prepare("SELECT * FROM $tbl");
+ok( defined $sth,'Statement handle defined');
+
+is( $sth->{ado_commandtimeout}, 20,'sth ado_commandtimeout');
+$sth->{ado_commandtimeout} = 10;
+is( $sth->{ado_commandtimeout}, 10,'sth ado_commandtimeout');
+is( $sth->{ado_conn}{CommandTimeout}, 20,'ADO Connection CommandTimeout');
+is( $sth->{ado_comm}{CommandTimeout}, 10,'ADO Command CommandTimeout');
+
+$sth = undef;
+
 SKIP: {
-  skip('SQLOLEDB specific tests', 18 )
+  skip('SQLOLEDB specific tests', 17 )
     if $dbh->{ado_conn}{Provider} !~ /^SQLOLEDB/;
 
   $dbh->{AutoCommit} = 0;
 
-  my $proc = $ADOTEST::table_name . '_WAIT';
+  my $proc = $DBD_TEST::table_name . '_WAIT';
 
   my $sql = "CREATE PROCEDURE $proc AS waitfor delay '00:00:07'";
 
   ok( $dbh->do( $sql ),"do: $sql");
-
-  is( $dbh->{ado_commandtimeout}, 30,'dbh ado_commandtimeout');
 
   ok( $dbh->do( $proc ),"do: $proc");
 

@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -42,9 +42,9 @@ SKIP: {
 
 my $catalog = undef;  # TODO: current catalog?
 my $schema  = undef;  # TODO: current schema?
-my $tbl     = $ADOTEST::table_name;
+my $tbl     = $DBD_TEST::table_name;
 
-my $ti = ADOTEST::get_type_for_column( $dbh,'A');
+my $ti = DBD_TEST::get_type_for_column( $dbh,'A');
 is( ref $ti,'HASH','Type info');
 
 {

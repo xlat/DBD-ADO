@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -17,8 +17,8 @@ if (defined $ENV{DBI_DSN}) {
 
 pass('Cursor type tests');
 
-my $tbl = $ADOTEST::table_name;
-my @col = sort keys %ADOTEST::TestFieldInfo;
+my $tbl = $DBD_TEST::table_name;
+my @col = sort keys %DBD_TEST::TestFieldInfo;
 
 my $non_supported = '-2146825037';
 
@@ -39,7 +39,7 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
   $dbh->{PrintError} = 0;
 pass('Database connection created');
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 ok( tab_insert( $dbh, $data, \@col ),'Insert test data');
 ok( tab_select( $dbh ),'Select test data');
@@ -72,11 +72,11 @@ ok( defined $sth2,'Statement handle 2 defined');
 undef $sth1;
 undef $sth2;
 
-# Testing a prepare statement with different cursortypes.
+# Testing a prepare statement with different cursor types.
 
 my @CursorTypes = qw(adOpenForwardOnly adOpenKeyset adOpenDynamic adOpenStatic);
 for my $ct ( @CursorTypes ) {
-  my $sth = $dbh->prepare("SELECT * FROM $tbl ORDER BY A", { CursorType => $ct } );
+  my $sth = $dbh->prepare("SELECT * FROM $tbl ORDER BY A", { ado_cursortype => $ct } );
   ok( $sth,"Prepare statement handle using CursorType => $ct");
   my $rc = $sth->execute;
   SKIP: {
@@ -102,7 +102,7 @@ for my $ct ( @CursorTypes ) {
 #
 # pass( "Test creating executing statement handle 2 while looping statement handle 1" );
 # ok ( $sth1 = $dbh->prepare( q{select name, type from sysobjects where type = 'U '},
-#   { CursorType => 'adOpenStatic' } ),
+#   { ado_cursortype => 'adOpenStatic' } ),
 #   " test prepare with CursorType => adOpenStatic");
 #
 # die "Undefined statement handle: \n" unless $sth1;
@@ -112,7 +112,7 @@ for my $ct ( @CursorTypes ) {
 # while( my ($name, $type) = $sth1->fetchrow_array ) {
 # #   print "# Object $name, Type $type\n";
 #   my $sth2;
-#   ok( $sth2 = $dbh->prepare("select * from $name", { CursorType => 'adOpenForwardOnly' } ),
+#   ok( $sth2 = $dbh->prepare("select * from $name", { ado_cursortype => 'adOpenForwardOnly' } ),
 #     " selecting data from $name CursorType => adOpenForwardOnly"
 #   );
 #
@@ -128,7 +128,7 @@ for my $ct ( @CursorTypes ) {
 #
 # }
 
-ok( ADOTEST::tab_delete( $dbh ),'Drop test table');
+ok( DBD_TEST::tab_delete( $dbh ),'Drop test table');
 
 ok( $dbh->disconnect,'Disconnect');
 
@@ -189,7 +189,7 @@ sub tab_insert {
 
   for ( @$data ) {
     for my $i ( 0..$#$cols ) {
-      my $ti = ADOTEST::get_type_for_column( $dbh, $cols->[$i] );
+      my $ti = DBD_TEST::get_type_for_column( $dbh, $cols->[$i] );
       $sth->bind_param( $i+1, $_->[$i], { TYPE => $ti->{DATA_TYPE} } );
     }
     $sth->execute;

@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -20,10 +20,10 @@ pass('Column info tests');
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
-my $tbl = $ADOTEST::table_name;
+my $tbl = $DBD_TEST::table_name;
 
 {
-  ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+  ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 }
 # TODO: handle catalog and schema ($tbl may exist in more then one schema)
 {
@@ -45,7 +45,7 @@ my $tbl = $ADOTEST::table_name;
   my $sth = $dbh->column_info( undef, undef, $tbl, undef );
   ok( defined $sth,'Statement handle defined');
 
-  my @ColNames = sort keys %ADOTEST::TestFieldInfo;
+  my @ColNames = sort keys %DBD_TEST::TestFieldInfo;
   print "# Columns:\n";
   my $i = 0;
   while ( my $row = $sth->fetch )
@@ -59,7 +59,7 @@ my $tbl = $ADOTEST::table_name;
     is( $row->[ 2], $tbl             ,"Is this table name $tbl?");
     is( $row->[16], $i               ,"Is this ordinal position $i?");
     is( $row->[ 3], $ColNames[$i-1]  ,"Is this column name $ColNames[$i-1]?");
-    my $ti = ADOTEST::get_type_for_column( $dbh, $row->[3] );
+    my $ti = DBD_TEST::get_type_for_column( $dbh, $row->[3] );
 #   is( $row->[ 4] , $ti->{DATA_TYPE},"Is this data type $ti->{DATA_TYPE}?");
     is( $row->[ 5] , $ti->{TYPE_NAME},"Is this type name $ti->{TYPE_NAME}?");
   }

@@ -1,6 +1,15 @@
 
+Remove global error variables
+
 Adjust return codes wrt the spec
 
+Add $dbh->last_insert_id
+
+Reimplement 'invalid attribute' test in t/21sth.t (catch warning).
+
+Reimplement the t/23warn.t tests.
+
+Improve LOB tests.
 
 ParamValues: What's the reason for the following problem?
 
@@ -15,12 +24,3 @@ ParamValues: What's the reason for the following problem?
       }
       return $h;
     }
-
-
-Add $dbh->last_insert_id
-
-Reimplement 'invalid attribute' test in t/21sth.t (catch warning).
-
-Reimplement the t/23warn.t tests.
-
-Improve LOB tests.

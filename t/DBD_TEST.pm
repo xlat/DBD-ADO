@@ -1,4 +1,4 @@
-package ADOTEST;
+package DBD_TEST;
 
 =head1 DESCRIPTION
 
@@ -22,7 +22,7 @@ use DBI qw(:sql_types);
 
 use vars qw($VERSION $table_name %TestFieldInfo %LTestFieldInfo);
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 $table_name = 'PERL_DBD_TEST';
 
 %TestFieldInfo = (

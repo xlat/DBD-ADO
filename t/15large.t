@@ -5,32 +5,27 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 use Time::HiRes qw(gettimeofday tv_interval);
 
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 36;
+  plan tests => 33;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
 
 pass('Large insert tests');
 
-my $tbl = $ADOTEST::table_name;
+my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
+pass('Database connection created');
+
+my $tbl = $DBD_TEST::table_name;
 
 my $MAX_ROWS = 200;
 
-my $dbh = DBI->connect( $ENV{DBI_DSN}, $ENV{DBI_USER}, $ENV{DBI_PASS},
-  {
-    ado_commandtimeout => 20
-  # ado_cursortype     => 'adOpenStatic'
-  })
-  or die "Connect failed: $DBI::errstr\n";
-pass('Database connection created');
-
-ok( ADOTEST::tab_create( $dbh ),"Create table $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"Create table $tbl");
 
 my $sth = $dbh->prepare("SELECT * FROM $tbl",
   { ado_cursortype => 'adOpenStatic' }
@@ -75,15 +70,6 @@ $sth = $dbh->prepare("SELECT * FROM $tbl",
 );
 ok( defined $sth,"Prepared select * statement, cursortype, users, and usecmd defined");
 ok( $sth->execute,"Execute select");
-$sth->finish; $sth = undef;
-
-$sth = $dbh->prepare("SELECT * FROM $tbl");
-ok( defined $sth,"Prepared select * statement");
-
-$sth->{ado_commandtimeout} = 37;
-ok( $sth->{ado_commandtimeout} == 37,"Modify ado commandtimeout");
-ok( $sth->{ado_comm}->{CommandTimeout} == 37,"Modify command commandtimeout");
-
 $sth->finish; $sth = undef;
 
 # for my $ac ( 0, 1 ) {

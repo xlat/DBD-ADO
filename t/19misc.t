@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -17,8 +17,8 @@ if ( defined $ENV{DBI_DSN} ) {
 
 pass('Miscellaneous tests');
 
-my $tbl = $ADOTEST::table_name;
-my @col = sort keys %ADOTEST::TestFieldInfo;
+my $tbl = $DBD_TEST::table_name;
+my @col = sort keys %DBD_TEST::TestFieldInfo;
 
 my $longstr = 'THIS IS A STRING LONGER THAN 80 CHARS.  THIS SHOULD BE CHECKED FOR TRUNCATION AND COMPARED WITH ITSELF.';
 my $longstr2 = $longstr . '  ' . $longstr . '  ' . $longstr . '  ' . $longstr;
@@ -38,7 +38,7 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
   $dbh->{PrintError} = 0;
 pass('Database connection created');
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 ok( tab_insert( $dbh, $data, \@col ),'Insert test data');
 ok( tab_select( $dbh ),'Select test data');
@@ -66,7 +66,7 @@ is( select_long( $dbh ), 0, 'Test LongTruncOk OFF');
 }
 
 my $sth = $dbh->prepare("SELECT D FROM $tbl WHERE D > ?");
-my $ti = ADOTEST::get_type_for_column( $dbh,'D');
+my $ti = DBD_TEST::get_type_for_column( $dbh,'D');
 my $dt = '1998-05-12';
 $sth->bind_param( 1, $dt, { TYPE => $ti->{DATA_TYPE} } );
 $sth->execute;
@@ -184,7 +184,7 @@ sub tab_insert {
 
   for ( @$data ) {
     for my $i ( 0..$#$cols ) {
-      my $ti = ADOTEST::get_type_for_column( $dbh, $cols->[$i] );
+      my $ti = DBD_TEST::get_type_for_column( $dbh, $cols->[$i] );
       $sth->bind_param( $i+1, $_->[$i], { TYPE => $ti->{DATA_TYPE} } );
     }
     $sth->execute;

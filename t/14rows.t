@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 use Time::HiRes qw(gettimeofday tv_interval);
 
 use Test::More;
@@ -18,21 +18,16 @@ if (defined $ENV{DBI_DSN}) {
 
 pass('Insert tests');
 
-my $tbl1 = $ADOTEST::table_name;
+my $tbl1 = $DBD_TEST::table_name;
 my $tbl2 = $tbl1 . '_2';
 
 my $MAX_ROWS = 200;
 
-my $dbh = DBI->connect( $ENV{DBI_DSN}, $ENV{DBI_USER}, $ENV{DBI_PASS},
-  {
-    ado_commandtimeout => 20
-  # ado_cursortype     => 'adOpenStatic'
-  })
-  or die "Connect failed: $DBI::errstr\n";
+my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
-ok( ADOTEST::tab_create( $dbh, $tbl1 ),"Create table $tbl1");
-ok( ADOTEST::tab_create( $dbh, $tbl2 ),"Create table $tbl2");
+ok( DBD_TEST::tab_create( $dbh, $tbl1 ),"Create table $tbl1");
+ok( DBD_TEST::tab_create( $dbh, $tbl2 ),"Create table $tbl2");
 
 # for my $ac ( 0, 1 ) {
 #   pass("Testing with AutoCommit $ac");

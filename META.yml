@@ -1,6 +1,6 @@
 # http://module-build.sourceforge.net/META-spec.html
 name:         DBD-ADO
-version:      2.93
+version:      2.94
 version_from: lib/DBD/ADO.pm
 installdirs:  site
 requires:

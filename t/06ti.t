@@ -5,7 +5,6 @@ $| = 1;
 use strict;
 use warnings;
 use DBI ();
-use ADOTEST();
 
 use Test::More;
 

@@ -39,4 +39,4 @@ t/42ddcol.t
 t/43ddpk.t
 t/44ddfk.t
 t/51qi.t
-t/ADOTEST.pm
+t/DBD_TEST.pm

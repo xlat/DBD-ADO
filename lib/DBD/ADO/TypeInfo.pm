@@ -6,7 +6,7 @@ use warnings;
 use DBI();
 use DBD::ADO::Const();
 
-$DBD::ADO::TypeInfo::VERSION = '2.82';
+$DBD::ADO::TypeInfo::VERSION = '2.83';
 
 my $Enums = DBD::ADO::Const->Enums;
 my $Dt = $Enums->{DataTypeEnum};
@@ -145,7 +145,7 @@ my $ado2dbi =
 my $ado2dbi3 =
 # -----------------------------------------------------------------------------
 {
-      # AdoType           IsLong IsFixed => SqlType
+  #     AdoType     IsLong IsFixed => SqlType
   $Dt->{adBinary   } => { 0 => { 0 => DBI::SQL_VARBINARY
                                , 1 => DBI::SQL_BINARY        }
                         , 1 => { 0 => DBI::SQL_LONGVARBINARY
@@ -166,15 +166,13 @@ my $ado2dbi3 =
 sub ado2dbi  # Convert an ADO data type into an DBI/ODBC/SQL data type.
 # -----------------------------------------------------------------------------
 {
-  my ($AdoType, $IsFixed, $IsLong ) = @_;
+  my ( $AdoType, $IsFixed, $IsLong ) = @_;
 
-  # Set default values for IsFixed and IsLong.
   $IsFixed = 0 unless $IsFixed;
   $IsLong  = 0 unless $IsLong ;
 
-#  return $dbh->set_err( $DBD::ADO::err || -1,
-#    "convert_ado_to_odbc: call without any attributes.")
-#  unless $AdoType;
+#  return $dbh->set_err( -1,"ado2dbi: call without any attributes")
+#    unless $AdoType;
 
   my $SqlType = 0;
 
@@ -183,7 +181,7 @@ sub ado2dbi  # Convert an ADO data type into an DBI/ODBC/SQL data type.
   }
   elsif ( exists $ado2dbi3->{$AdoType}{$IsLong}{$IsFixed} ) {
     $SqlType = $ado2dbi3->{$AdoType}{$IsLong}{$IsFixed};
-    }
+  }
   elsif ( exists $ado2dbi->{$AdoType} ) {
     $SqlType = $ado2dbi->{$AdoType};
   }
@@ -209,12 +207,10 @@ sub ado2dbi  # Convert an ADO data type into an DBI/ODBC/SQL data type.
 sub determine_type_support
 # -----------------------------------------------------------------------------
 {
-  my ($dbh) = @_;
+  my ( $dbh ) = @_;
   die 'dbh undefined' unless $dbh;
 
   $dbh->trace_msg("    -> ado_determine_type_support\n", 3 );
-
-  my $conn = $dbh->{ado_conn};
 
   # Attempt to convert data types from ODBC to ADO.
   my %local_types = (
@@ -314,32 +310,34 @@ sub determine_type_support
   );
 
   # Get the Provider Types attributes.
+  my $QueryType = 'adSchemaProviderTypes';
+  my $conn = $dbh->{ado_conn};
   my @sort_rows;
   my %ct;
-  my $rs = $conn->OpenSchema( $Enums->{SchemaEnum}{adSchemaProviderTypes} );
-  return if DBD::ADO::Failed( $dbh,"OpenSchema error");
+  my $rs = $conn->OpenSchema( $Enums->{SchemaEnum}{$QueryType} );
+  return if DBD::ADO::Failed( $dbh,"Can't OpenSchema ($QueryType)");
 
-  my $ado_fields = [ Win32::OLE::in( $rs->Fields ) ];
-  my $ado_info   = [ map { $_->Name } @$ado_fields ];
+  my @ado_info = map { $_->Name } Win32::OLE::in( $rs->Fields );
 
   while ( !$rs->{EOF} ) {
     # Sort by row
-    my $type_name = $rs->{TYPE_NAME}->{Value};
+    my $type_name = $rs->{TYPE_NAME}{Value};
     my $def;
-    push ( @sort_rows,  $def = join(' '
-    , $rs->{DATA_TYPE}->Value
-    , $rs->{BEST_MATCH}->Value || 0
-    , $rs->{IS_LONG}->Value || 0
-    , $rs->{IS_FIXEDLENGTH}->Value || 0
-    , $rs->{COLUMN_SIZE}->Value
-    , $rs->{TYPE_NAME}->Value
+    push ( @sort_rows, $def = join(' '
+    , $rs->{DATA_TYPE     }{Value}
+    , $rs->{BEST_MATCH    }{Value} || 0
+    , $rs->{IS_LONG       }{Value} || 0
+    , $rs->{IS_FIXEDLENGTH}{Value} || 0
+    , $rs->{COLUMN_SIZE   }{Value}
+    , $rs->{TYPE_NAME     }{Value}
     ));
     $dbh->trace_msg("    -- data type $type_name: $def\n", 5 );
-    @{$ct{$type_name}} = map { $rs->{$_}->Value || '' } @$ado_info;
+    @{$ct{$type_name}} = map { $rs->{$_}{Value} || '' } @ado_info;
     $rs->MoveNext;
   }
   $rs->Close if $rs && $rs->State & $Enums->{ObjectStateEnum}{adStateOpen};
   $rs = undef;
+
   for my $t ( @sql_types ) {
     # Attempt to work with LONG text fields.
     # However for a LONG field, the order by ... isn't always the best pick.
@@ -357,7 +355,7 @@ sub determine_type_support
     else                                     { $re = qr{^($alt)\s\d\s\d\s}    }
 
     for ( sort { $b cmp $a } grep { /$re/ } @sort_rows ) {
-      my ($cc) = m/\d+\s+(\D\w?.*)$/;
+      my ( $cc ) = m/\d+\s+(\D\w?.*)$/;
       Carp::carp "$cc does not exist in hash\n" unless exists $ct{$cc};
       my @rec = @{$ct{$cc}};
       $dbh->trace_msg("    ** Changing type $rec[1] -> $t : @rec\n", 6 );
@@ -372,7 +370,8 @@ sub determine_type_support
 sub type_info_all_1
 # -----------------------------------------------------------------------------
 {
-  my ($dbh) = @_;
+  my ( $dbh ) = @_;
+  my $QueryType = 'adSchemaProviderTypes';
   my $names = {
     TYPE_NAME          =>  0
   , DATA_TYPE          =>  1
@@ -391,15 +390,15 @@ sub type_info_all_1
   , MAXIMUM_SCALE      => 14
   };
   # If the type information is previously obtained, use it.
-  unless( $dbh->{ado_all_types_supported} ) {
+  unless ( $dbh->{ado_all_types_supported} ) {
     DBD::ADO::TypeInfo::determine_type_support( $dbh )
-      or Carp::croak 'determine_type_support failed: ', $dbh->{errstr};
+      or Carp::croak "Can't determine_type_support: $dbh->{errstr}";
   }
-  my $ops = DBD::ADO::db::ado_open_schema( $dbh,'adSchemaProviderTypes')
-    or Carp::croak 'ops undefined!';
+  my $ops = DBD::ADO::db::ado_open_schema( $dbh, $QueryType )
+    or Carp::croak "Can't OpenSchema ($QueryType)";
 
   my $sth = DBI->connect('dbi:Sponge:','','', { RaiseError => 1 } )->prepare(
-    'adSchemaProviderTypes', { rows => [ @{$dbh->{ado_all_types_supported}} ]
+    $QueryType, { rows => [ @{$dbh->{ado_all_types_supported}} ]
   , NAME => [ @{$ops->{NAME}} ]
   });
   $ops->finish; $ops = undef;
@@ -420,12 +419,12 @@ sub type_info_all_1
 sub type_info_all_2
 # -----------------------------------------------------------------------------
 {
-  my ($dbh) = @_;
+  my ( $dbh ) = @_;
   my $QueryType = 'adSchemaProviderTypes';
   my $conn = $dbh->{ado_conn};
   my @Rows;
   my $rs = $conn->OpenSchema( $Enums->{SchemaEnum}{$QueryType} );
-  return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
+  return if DBD::ADO::Failed( $dbh,"Can't OpenSchema ($QueryType)");
 
   while ( !$rs->{EOF} ) {
     my $AdoType = $rs->{DATA_TYPE     }{Value};
@@ -465,9 +464,9 @@ sub type_info_all_2
 sub Find3
 # -----------------------------------------------------------------------------
 {
-  my ($dbh, $AdoType, $IsFixed, $IsLong) = @_;
+  my ( $dbh, $AdoType, $IsFixed, $IsLong ) = @_;
 
-  unless( $dbh->{ado_type_info_hash} ) {
+  unless ( $dbh->{ado_type_info_hash} ) {
     my $sth = $dbh->func('adSchemaProviderTypes','OpenSchema');
     while ( my $r = $sth->fetchrow_hashref ) {
       push @{$dbh->{ado_type_info_hash}{$r->{DATA_TYPE}}{$r->{IS_FIXEDLENGTH}}{$r->{IS_LONG}}}, $r;
@@ -498,7 +497,8 @@ Steffen Goeldner (sgoeldner@cpan.org)
 
 =head1 COPYRIGHT
 
-Copyright (c) 2002-2004 Steffen Goeldner. All rights reserved.
+Copyright (c) 2002-2005 Steffen Goeldner. All rights reserved.
+
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 

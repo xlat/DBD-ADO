@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -18,7 +18,7 @@ if (defined $ENV{DBI_DSN}) {
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 ok ( defined $dbh, 'Connection');
 
-ok( ADOTEST::tab_create( $dbh ),"Create the test table $ADOTEST::table_name");
+ok( DBD_TEST::tab_create( $dbh ),"Create the test table $DBD_TEST::table_name");
 
 my $data =
 [
@@ -32,7 +32,7 @@ ok( tab_insert( $dbh, $data ),'Insert test data');
 
 ok( tab_select( $dbh ),'Select test data');
 
-ok( ADOTEST::tab_delete( $dbh ),'Drop test table');
+ok( DBD_TEST::tab_delete( $dbh ),'Drop test table');
 
 ok( $dbh->disconnect,'Disconnect');
 
@@ -41,9 +41,9 @@ sub tab_select
 {
   my $dbh = shift;
 
-  my $sth = $dbh->prepare("SELECT A,B,C,D FROM $ADOTEST::table_name WHERE a = ?")
+  my $sth = $dbh->prepare("SELECT A,B,C,D FROM $DBD_TEST::table_name WHERE a = ?")
     or return undef;
-  my $ti = ADOTEST::get_type_for_column( $dbh,'A');
+  my $ti = DBD_TEST::get_type_for_column( $dbh,'A');
   for my $v ( 1, 3, 2, 4, 10 ) {
     $sth->bind_param( 1, $v, { TYPE => $ti->{DATA_TYPE} } );
     $sth->execute;
@@ -63,7 +63,7 @@ sub tab_insert
   my $dbh  = shift;
   my $data = shift;
 
-  my $sth = $dbh->prepare("INSERT INTO $ADOTEST::table_name (A, B, C, D) VALUES (?, ?, ?, ?)");
+  my $sth = $dbh->prepare("INSERT INTO $DBD_TEST::table_name (A, B, C, D) VALUES (?, ?, ?, ?)");
   unless ( $sth ) {
     print $DBI::errstr;
     return 0;
@@ -72,17 +72,17 @@ sub tab_insert
   for ( @$data ) {
     my $ti;
 
-    $ti = ADOTEST::get_type_for_column( $dbh,'A');
+    $ti = DBD_TEST::get_type_for_column( $dbh,'A');
     $sth->bind_param( 1, $_->[ 0], { TYPE => $ti->{DATA_TYPE} } );
 
-    $ti = ADOTEST::get_type_for_column( $dbh,'B');
+    $ti = DBD_TEST::get_type_for_column( $dbh,'B');
     $_->[1] = $_->[1] x (int( int( $ti->{COLUMN_SIZE} / 2 ) / length( $_->[1] ) ) );  # XXX
     $sth->bind_param( 2, $_->[ 1], { TYPE => $ti->{DATA_TYPE} } );
 
-    $ti = ADOTEST::get_type_for_column( $dbh,'C');
+    $ti = DBD_TEST::get_type_for_column( $dbh,'C');
     $sth->bind_param( 3, $_->[ 2], { TYPE => $ti->{DATA_TYPE} } );
 
-    $ti = ADOTEST::get_type_for_column( $dbh,'D');
+    $ti = DBD_TEST::get_type_for_column( $dbh,'D');
     my $i = ( $ti->{DATA_TYPE} == DBI::SQL_TYPE_DATE || $ti->{DATA_TYPE} == DBI::SQL_DATE ) ? 3 : 4;
     $sth->bind_param( 4, $_->[$i], { TYPE => $ti->{DATA_TYPE} } );
 

@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -14,6 +14,8 @@ if ( defined $ENV{DBI_DSN} ) {
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
+
+my $tbl = $DBD_TEST::table_name;
 
 pass('Transaction / AutoCommit tests');
 
@@ -30,7 +32,7 @@ for ('rollback','commit')
   $dbh->$_;
   like( $Warning, qr/ineffective/, "Warning expected: $Warning");
 }
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $ADOTEST::table_name");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 $dbh->{AutoCommit} = 1;
 ok( $dbh->{AutoCommit}, "AutoCommit ON: $dbh->{AutoCommit}");
@@ -54,7 +56,7 @@ ok( $dbh->rollback    ,'rollback');
 ok(!$dbh->{BegunWork} ,'BegunWork OFF');
 ok( $dbh->{AutoCommit},'AutoCommit ON');
 
-ok( $dbh->do("DROP TABLE $ADOTEST::table_name"),"DROP TABLE $ADOTEST::table_name");
+ok( $dbh->do("DROP TABLE $tbl"),"DROP TABLE $tbl");
 
 ok( $dbh->disconnect,'Disconnect');
 
@@ -64,7 +66,6 @@ ok( $dbh->disconnect,'Disconnect');
 # -----------------------------------------------------------------------------
 sub commitTest {
   my $dbh = shift;
-  my $tbl = $ADOTEST::table_name;
 
   $dbh->do("DELETE FROM $tbl WHERE A = 100") or return undef;
   {

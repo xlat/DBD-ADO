@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -29,7 +29,7 @@ SKIP: {
   skip 'foreign_key_info not supported by provider', 1
     if $dbh->err && $dbh->err == $non_supported;
   ok( defined $sth,'Statement handle defined for foreign_key_info()');
-  ADOTEST::dump_results( $sth );
+  DBD_TEST::dump_results( $sth );
 }
 # -----------------------------------------------------------------------------
 

@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -22,10 +22,10 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
    $dbh->{PrintError} = 0;
 pass('Database connection created');
 
-my $tbl = $ADOTEST::table_name;
+my $tbl = $DBD_TEST::table_name;
 my $cnt = 7;
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 is( $dbh->do("INSERT INTO $tbl( A, B ) VALUES( $_,'T$_')"), 1,"($_) Insert")
   for 1..$cnt;

@@ -5,7 +5,7 @@ $| = 1;
 use strict;
 use warnings;
 use DBI();
-use ADOTEST();
+use DBD_TEST();
 
 use Test::More;
 
@@ -22,10 +22,10 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
    $dbh->{PrintError} = 0;
 pass('Database connection created');
 
-my $tbl = $ADOTEST::table_name;
-my @col = sort keys %ADOTEST::TestFieldInfo;
+my $tbl = $DBD_TEST::table_name;
+my @col = sort keys %DBD_TEST::TestFieldInfo;
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 ok( $dbh->do("INSERT INTO $tbl( $_ ) VALUES( ? )", undef, undef ),"Inserting NULL into $_")
   for @col;
@@ -37,7 +37,7 @@ ok( defined $sth,'Prepare insert statement');
 
 my $i = 0;
 for ( @col ) {
-  my $ti = ADOTEST::get_type_for_column( $dbh, $_ );
+  my $ti = DBD_TEST::get_type_for_column( $dbh, $_ );
   ok( $sth->bind_param( ++$i, undef, { TYPE => $ti->{DATA_TYPE} } ),"Bind parameter for column $_");
 }
 ok( $sth->execute,'Execute prepared statement with bind params');

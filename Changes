@@ -1,3 +1,18 @@
+2005-01-30  2.94
+
+  Reworked db/st handle attributes:
+  - fetching all the data of a SELECT sets Active off
+  - dropped the RowsInCache attribute (ADO doesn't provide this
+    information and it was confused with RowCacheSize anyway)
+  - added support for the RowCacheSize attribute
+  - dropped the User attribute
+  - deprecated CursorType, Filter, ADO_Columns, Trim_Catalog
+    (use the corresponding ado_* attributes)
+  - added ado_ConnectionTimeout and ado_Mode to avoid the abuse of the
+    ConnectionString
+
+  Renamed ADOTEST to DBD_TEST.
+
 2004-10-17  2.93
 
   Implemented do().
