@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I./t
+#!perl -I./t
 
 $| = 1;
 

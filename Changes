@@ -1,3 +1,13 @@
+2003-11-16  2.79
+
+  Added t/51qi.t to test quoted identifiers (and removed similar
+  tests from t/15func.t).
+
+  Added t/07q.t to test quoted values (and removed similar tests
+  from t/15func.t).
+
+  Completed the Win32::OLE::Const to DBD::ADO::Const transition.
+
 2003-11-09  2.78
 
   Modified t/09bind.t to use Test::More.

@@ -18,6 +18,7 @@ t/03dbatt.t
 t/05gi.t
 t/05meth.t
 t/07long.t
+t/07q.t
 t/09bind.t
 t/09null.t
 t/11curs.t
@@ -32,5 +33,6 @@ t/41ddtbl.t
 t/42ddcol.t
 t/43ddpk.t
 t/44ddfk.t
+t/51qi.t
 t/ADOTEST.pm
 META.yml                                Module meta-data (added by MakeMaker)

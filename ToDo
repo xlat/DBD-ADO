@@ -1,11 +1,17 @@
 
 Implement ping()
 
-Replace ado_consts with DBD::ADO::Const->Enums
+install_method('ado_open_schema')
 
 Adjust return codes wrt the spec
 
 Improve bind_param for types other than Varchar, add more tests.
+
+Add $sth->{ParamValues}
+
+Improve type_info_all
+
+Add $dbh->last_insert_id
 
 Reimplement the t/23warn.t tests.
 
