@@ -9,7 +9,7 @@
   use strict;
   use vars qw($VERSION  $drh $err $errstr $state);
 
-  $VERSION = '2.77';
+  $VERSION = '2.78';
 
 # Copyright (c) 1998, Tim Bunce
 # Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
@@ -81,7 +81,6 @@ my $VT_I4_BYREF;
 	use vars qw($imp_data_size);
   use DBI qw(:sql_types);
   require Win32::OLE;
-	require Win32::OLE::Const;
 	require Win32::OLE::Variant;
 	$imp_data_size = 0;
 
@@ -92,81 +91,28 @@ my $VT_I4_BYREF;
 	use constant DBPROPVAL_TC_NONE				=> 0;
 
 	my $ado_consts = ();
-	my $myado_types_supported = ();
-	my $myado_types_supported2 = ();
+
+  sub data_sources {
+    my($drh, $attr) = @_;
+    my @list = ();
+    $drh->{ado_data_sources} ||= eval { require Local::DBD::ADO::DSN } || [];
+    $drh->trace_msg("    !! $@", 7 ) if $@;
+    for my $h ( @{$drh->{ado_data_sources}} ) {
+      my @a = map "$_=$h->{$_}", sort keys %$h;
+      push @list, 'dbi:ADO:' . join(';', @a );
+    }
+    return @list;
+  }
 
 	sub connect {
 		my ($drh, $dsn, $user, $auth) = @_;
 
 	unless ($ado_consts) {
-	    my $name = "Microsoft ActiveX Data Objects 2\\.\\d+ Library";
-	    $ado_consts = Win32::OLE::Const->Load($name)
-		or die "Unable to load Win32::OLE::Const ``$name'' ".Win32::OLE->LastError;
+    require DBD::ADO::Const;
+    @$ado_consts{keys %$_} = values %$_ for values %{DBD::ADO::Const->Enums};
+
 	    $VT_I4_BYREF = Win32::OLE::Variant::VT_I4()
 			 | Win32::OLE::Variant::VT_BYREF();
-
-
-	$myado_types_supported2 = {
-	              # AdoType           IsLong IsFixed => SqlType
-	  $ado_consts->{adBinary   } => { 0 => { 0 => DBI::SQL_VARBINARY
-	                                       , 1 => DBI::SQL_BINARY        }
-	                                , 1 => { 0 => DBI::SQL_LONGVARBINARY
-	                                       , 1 => DBI::SQL_UNKNOWN_TYPE  }}
-	, $ado_consts->{adChar     } => { 0 => { 0 => DBI::SQL_VARCHAR
-	                                       , 1 => DBI::SQL_CHAR          }
-	                                , 1 => { 0 => DBI::SQL_LONGVARCHAR
-	                                       , 1 => DBI::SQL_UNKNOWN_TYPE  }}
-	, $ado_consts->{adWChar    } => { 0 => { 0 => DBI::SQL_WVARCHAR
-	                                       , 1 => DBI::SQL_WCHAR         }
-	                                , 1 => { 0 => DBI::SQL_WLONGVARCHAR
-	                                       , 1 => DBI::SQL_UNKNOWN_TYPE  }}
-#	, $ado_consts->{adVarBinary} =>
-#	, $ado_consts->{adVarChar  } =>
-#	, $ado_consts->{adVarWChar } =>
-	};
-
-	$myado_types_supported = {
-	  $ado_consts->{adArray}						=> DBI::SQL_ARRAY
-	# , $ado_consts->{adBigInt}						=> DBI::SQL_BIGINT
-	, $ado_consts->{adBinary}						=> DBI::SQL_BINARY
-	, $ado_consts->{adBoolean}					=> DBI::SQL_BOOLEAN
-	, $ado_consts->{adBSTR}							=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adChapter}					=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adChar}							=> DBI::SQL_CHAR
-	, $ado_consts->{adCurrency}					=> DBI::SQL_NUMERIC
-	, $ado_consts->{adDate}							=> DBI::SQL_TYPE_TIMESTAMP # XXX Not really!
-	, $ado_consts->{adDBDate}						=> DBI::SQL_TYPE_DATE
-	, $ado_consts->{adDBTime}						=> DBI::SQL_TYPE_TIME
-	, $ado_consts->{adDBTimeStamp}			=> DBI::SQL_TYPE_TIMESTAMP
-	, $ado_consts->{adDecimal}					=> DBI::SQL_DECIMAL
-	, $ado_consts->{adDouble}						=> DBI::SQL_DOUBLE
-	, $ado_consts->{adEmpty}						=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adError}						=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adFileTime}					=> DBI::SQL_TIMESTAMP
-	, $ado_consts->{adGUID}							=> DBI::SQL_GUID
-	, $ado_consts->{adIDispatch}				=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adInteger}					=> DBI::SQL_INTEGER
-	, $ado_consts->{adIUnknown}					=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adLongVarBinary}		=> DBI::SQL_LONGVARBINARY
-	, $ado_consts->{adLongVarChar}			=> DBI::SQL_LONGVARCHAR
-	, $ado_consts->{adLongVarWChar}			=> DBI::SQL_WLONGVARCHAR
-	, $ado_consts->{adNumeric}					=> DBI::SQL_NUMERIC
-	, $ado_consts->{adPropVariant}			=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adSingle}						=> DBI::SQL_FLOAT
-	, $ado_consts->{adSmallInt}					=> DBI::SQL_SMALLINT
-	, $ado_consts->{adTinyInt}					=> DBI::SQL_TINYINT
-	, $ado_consts->{adUnsignedBigInt}		=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adUnsignedInt}			=> DBI::SQL_WCHAR
-	, $ado_consts->{adUnsignedSmallInt}	=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adUnsignedTinyInt}	=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adUserDefined}			=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adVarBinary}				=> DBI::SQL_VARBINARY
-	, $ado_consts->{adVarChar}					=> DBI::SQL_VARCHAR
-	, $ado_consts->{adVariant}					=> DBI::SQL_UNKNOWN_TYPE
-	, $ado_consts->{adVarNumeric}				=> DBI::SQL_INTEGER
-	, $ado_consts->{adVarWChar}					=> DBI::SQL_WVARCHAR
-	, $ado_consts->{adWChar}						=> DBI::SQL_WCHAR
-	};
 	}
 
 	local $Win32::OLE::Warn = 0;
@@ -190,8 +136,6 @@ my $VT_I4_BYREF;
 				, ado_types_supported			=> undef
 				, ado_cursortype					=> undef
 				, ado_commandtimeout			=> undef
-				, myado_types_supported		=> undef
-				, myado_types_supported2	=> undef
 				, Attributes							=> undef
 				, CommandTimeout					=> undef
 				, ConnectionString				=> undef
@@ -288,12 +232,8 @@ my $VT_I4_BYREF;
 
 	# As a last step, add the ado_consts to the object.
 	$this->{ado_consts} = $ado_consts;
-	$this->{myado_types_supported} = $myado_types_supported;
-	$this->{myado_types_supported2} = $myado_types_supported2;
 
 	$ado_consts = undef;
-	$myado_types_supported = undef;
-	$myado_types_supported2 = undef;
 
 	return $outer;
 	}
@@ -357,6 +297,8 @@ my @sql_types_supported = ();
     use strict;
 
 		require Win32::OLE::Variant;
+
+    use DBD::ADO::TypeInfo();
 
 		# Rollback to the database.
 		sub rollback {
@@ -931,7 +873,7 @@ my @sql_types_supported = ();
 			my $ColFlags   = $RecSet->Fields('COLUMN_FLAGS')->{Value};
 			my $IsLong     = ( $ColFlags & $ado_consts->{adFldLong } ) ? 1 : 0;
 			my $IsFixed    = ( $ColFlags & $ado_consts->{adFldFixed} ) ? 1 : 0;
-			my @SqlType    = DBD::ADO::db::convert_ado_to_odbc( $dbh, $AdoType, $IsFixed, $IsLong );
+			my @SqlType    = DBD::ADO::TypeInfo::ado2dbi( $AdoType, $IsFixed, $IsLong );
 			my $IsNullable = $RecSet->Fields('IS_NULLABLE')->{Value} ? 'YES' : 'NO';
 			my $ColSize    = $RecSet->Fields('NUMERIC_PRECISION'       )->{Value}
 			              || $RecSet->Fields('CHARACTER_MAXIMUM_LENGTH')->{Value}
@@ -1332,62 +1274,6 @@ my @sql_types_supported = ();
 		$dbh->{ado_type_info_hash}{$AdoType}{$IsFixed}{$IsLong} || [];
 	}
 
-	# Attempt to convert an ADO data type into an ODBC/SQL data type.
-	sub convert_ado_to_odbc {
-		my ($dbh, $AdoType, $IsFixed, $IsLong ) = @_;
-
-		# Set default values for IsFixed and IsLong.
-		$IsFixed = 0 unless $IsFixed;
-		$IsLong  = 0 unless $IsLong ;
-
-		# method called with different handlers.
-		# Determine if call is statement or database handle.  If a statement handle
-		# change value to the database handle.
-
-		$dbh = $dbh->{ado_dbh} if ((ref $dbh) eq q{DBI::st});
-
-		# my $ado_consts = exists $dbh->{ado_consts}
-		# ? $dbh->{ado_consts} : $dbh->{ado_dbh}->{ado_consts};
-
-		my $ado_consts = $dbh->{ado_consts};
-
-			return $dbh->set_err( $DBD::ADO::err || -1,
-				"convert_ado_to_odbc: call without any attributes.")
-			unless $AdoType;
-
-			unless( $dbh->{ado_types_supported} ) {
-				&_determine_type_support($dbh);
-			}
-
-		my $SqlType = 0;
-
-		if ( $AdoType == $ado_consts->{adArray} ) {
-			$SqlType = 50;  # XXX DBI::SQL_ARRAY();
-		}
-		elsif ( exists $dbh->{myado_types_supported2}->{$AdoType}{$IsLong}{$IsFixed} ) {
-			$SqlType = $dbh->{myado_types_supported2}->{$AdoType}{$IsLong}{$IsFixed};
-			}
-		elsif ( exists $dbh->{myado_types_supported}->{$AdoType} ) {
-			$SqlType = $dbh->{myado_types_supported}->{$AdoType};
-		}
-
-		if ( wantarray ) {  # DATA_TYPE, SQL_DATA_TYPE, SQL_DATETIME_SUB
-			my @a = ( $SqlType );
-
-			if ( 90 < $SqlType && $SqlType < 100 ) {  # SQL_DATETIME
-				push @a, 9, $SqlType - 90;
-			}
-			elsif ( 100 < $SqlType && $SqlType < 120 ) {  # SQL_INTERVAL
-				push @a, 10, $SqlType - 100;
-			}
-			else {
-				push @a, $SqlType, undef;
-			}
-			return @a;
-		}
-		return $SqlType;
-	}
-
 	sub OpenSchema {
 		my ($dbh) = @_;
 		return &_open_schema;
@@ -1601,6 +1487,8 @@ my @sql_types_supported = ();
 		use Data::Dumper;
 
 		use Carp;
+
+    use DBD::ADO::TypeInfo();
 
 		$VT_VAR = VT_VARIANT() | VT_BYREF();
 		$VT_DAT = VT_DATE();
@@ -1895,7 +1783,7 @@ my @sql_types_supported = ();
 			unless ($nof == $num_of_fields);
 		$sth->STORE( NAME				=> [ map { $_->Name } @$ado_fields ] );
 		$sth->STORE( TYPE				=> [ map {
-						scalar DBD::ADO::db::convert_ado_to_odbc($sth, $_->Type)
+						scalar DBD::ADO::TypeInfo::ado2dbi( $_->Type )
 					} @$ado_fields ] );
 		$sth->STORE( PRECISION	=> [ map { $_->Precision } @$ado_fields ] );
 		$sth->STORE( SCALE			=> [
@@ -2154,6 +2042,20 @@ data sources.
 			example:
 			my $sth = $dbh->func( 'adSchemaProviderTypes', 'OpenSchema' );
 
+=head1 DBI Methods
+
+=head2 data_sources
+
+Because ADO doesn't provide a data source repository, DBD::ADO uses it's
+own. It tries to load Local::DBD::ADO::DSN and expects an array of hashes
+describing the data sources. See ex/Local/DBD/ADO/DSN.pm for an example.
+
+B<Warning:> This is experimental and may change.
+
+B<Warning:> Check for the unlikly case that a file Local/DBD/ADO/DSN.pm
+exists in your module search path which causes unwanted side effects when
+loaded.
+
 =head1 Enhanced DBI Methods
 
 =head2 prepare
@@ -2199,20 +2101,20 @@ The B<prepare> methods allows attributes: (from DBI)
 
 B<Warning:> This method is experimental and may change or disappear.
 
-	$sth = $dbh->table_info(\%attr);
+  $sth = $dbh->table_info(\%attr);
 
-	$sth = $dbh->table_info({
-		TABLE_TYPE => 'VIEW',
-		ADO_Columns => 1,
-		Trim_Catalog => 0,
-		Filter => q{TABLE_NAME LIKE 'C%'},
-	});
+  $sth = $dbh->table_info({
+    TABLE_TYPE => 'VIEW',
+    ADO_Columns => 1,
+    Trim_Catalog => 0,
+    Filter => q{TABLE_NAME LIKE 'C%'},
+  });
 
 Returns an active statement handle that can be used to fetch
 information about tables and views that exist in the database.
 By default the handle contains the columns described in the DBI documentation:
 
-	TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
+  TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
 
 =over
 
@@ -2221,25 +2123,25 @@ By default the handle contains the columns described in the DBI documentation:
 Additional ADO-only fields will be included if the ADO_Columns attribute
 is set to true:
 
-	%attr = (ADO_Columns => 1);
+  %attr = (ADO_Columns => 1);
 
 =item B<Trim_Catalog>
 
 Some ADO providers include path info in the TABLE_CAT column.
 This information will be trimmed if the Trim_Catalog attribute is set to true:
 
-	%attr = (Trim_Catalog => 1);
+  %attr = (Trim_Catalog => 1);
 
 =item B<Criteria>
 
 The ADO driver allows column criteria to be specified.  In this way the
 record set can be restricted, for example, to only include tables of type 'VIEW':
 
-	%attr = (TABLE_TYPE => 'VIEW')
+  %attr = (TABLE_TYPE => 'VIEW')
 
 You can add criteria for any of the following columns:
 
-	TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE
+  TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE
 
 =item B<Filter>
 
@@ -2248,17 +2150,17 @@ You can add criteria for any of the following columns:
 The ADO driver also allows the recordset to be filtered on a Criteria string:
 a string made up of one or more individual clauses concatenated with AND or OR operators.
 
-	%attr = (Filter => q{TABLE_TYPE LIKE 'SYSTEM%'})
+  %attr = (Filter => q{TABLE_TYPE LIKE 'SYSTEM%'})
 
 The criteria string is made up of clauses in the form FieldName-Operator-Value.
 This is more flexible than using column criteria in that the filter allows a number of operators:
 
-	<, >, <=, >=, <>, =, or LIKE
+  <, >, <=, >=, <>, =, or LIKE
 
 The Fieldname must be one of the ADO 'TABLES Rowset' column names:
 
-	TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION,
-	TABLE_GUID, TABLE_PROPID, DATE_CREATED, DATE_MODIFIED
+  TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION,
+  TABLE_GUID, TABLE_PROPID, DATE_CREATED, DATE_MODIFIED
 
 Value is the value with which you will compare the field values
 (for example, 'Smith', #8/24/95#, 12.345, or $50.00).
@@ -2273,22 +2175,22 @@ and they must be the last character in the string. Value cannot be null.
 
 B<Warning:> This method is experimental and may change or disappear.
 
-	@names = $dbh->tables(\%attr);
+  @names = $dbh->tables(\%attr);
 
 Returns a list of table and view names.
 Accepts any of the attributes described in the L<table_info> method:
 
-	@names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
+  @names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
 
 
 =head1 Warnings
 
-	Support for type_info_all is supported, however, you're not using
-	a true OLE DB provider (using the MS OLE DB -> ODBC), the first
-	hash may not be the "best" solution for the data type.
-	adSchemaProviderTypes does provide for a "best match" column, however
-	the MS OLE DB -> ODBC provider does not support the best match.
-	Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
+Support for type_info_all is supported, however, you're not using
+a true OLE DB provider (using the MS OLE DB -> ODBC), the first
+hash may not be the "best" solution for the data type.
+adSchemaProviderTypes does provide for a "best match" column, however
+the MS OLE DB -> ODBC provider does not support the best match.
+Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
 
 =head1 ADO
 

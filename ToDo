@@ -1,4 +1,8 @@
 
+Implement ping()
+
+Replace ado_consts with DBD::ADO::Const->Enums
+
 Adjust return codes wrt the spec
 
 Improve bind_param for types other than Varchar, add more tests.
@@ -6,8 +10,6 @@ Improve bind_param for types other than Varchar, add more tests.
 Reimplement the t/23warn.t tests.
 
 Mon  Apr 8, 2002  23:06:36
-
-Modify code to use new package DBD::ADO::TypeInfo
 
 Clean up the ADO -> ODBC and ODBC -> ADO code.
 

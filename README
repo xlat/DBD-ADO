@@ -67,6 +67,22 @@ Functions support
                             example:
                             my $sth = $dbh->func( 'adSchemaProviderTypes', 'OpenSchema' );
 
+
+DBI Methods
+
+data_sources
+
+Because ADO doesn't provide a data source repository, DBD::ADO uses it's
+own. It tries to load Local::DBD::ADO::DSN and expects an array of hashes
+describing the data sources. See ex/Local/DBD/ADO/DSN.pm for an example.
+
+Warning: This is experimental and may change.
+
+Warning: Check for the unlikly case that a file Local/DBD/ADO/DSN.pm
+exists in your module search path which causes unwanted side effects when
+loaded.
+
+
 Enhanced DBI Methods
 
   prepare

@@ -1,3 +1,13 @@
+2003-11-09  2.78
+
+  Modified t/09bind.t to use Test::More.
+
+  Added data_sources().
+
+  Moved some datatype related stuff into DBD::ADO::TypeInfo.
+
+  Win32::OLE::Const is no longer being used (in favor of DBD::ADO::Const).
+
 2003-11-02  2.77
 
   Added DBD::ADO::Const.
