@@ -1,3 +1,10 @@
+2004-01-18  2.85
+
+  Improved error handling to avoid problems with success/informational
+  messages, reported by Ed Belisle and Peter Hircock.
+  These 'success with information' conditions no longer trigger the normal
+  DBI error handling mechanisms.
+
 2004-01-11  2.84
 
   Reimplemented NULL tests (t/23null.t).
