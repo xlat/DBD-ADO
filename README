@@ -1,4 +1,13 @@
 
+Changes Version 2.72: 2003-09-03
+
+	Moved DBD::ADO::TypeInfo from DBD/ADO.pm to DBD/ADO/TypeInfo.pm.
+
+	Fixed number of tests at t\15func.t.
+
+	Fixed warning 'Use of uninitialized value in string eq at
+	t\02simple.t line 54'.
+
 Changes Version 2.71: 2003-08-31
 
 	New maintainer: Steffen Goeldner <sgoeldner@cpan.org>.

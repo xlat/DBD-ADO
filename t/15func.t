@@ -13,7 +13,7 @@ my ($pf, $sf);
 
 use Test::More;
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 49;
+	plan tests => 48;
 } else {
 	plan skip_all => 'Cannot test without DB info';
 }
@@ -106,7 +106,7 @@ my @qt_vals = (1, 2, undef, 'NULL', "ThisIsAString", "This is Another String");
 my @expt_vals = (q{'1'}, q{'2'}, "NULL", q{'NULL'}, q{'ThisIsAString'}, q{'This is Another String'});
 for (my $x = 0; $x <= $#qt_vals; $x++) {
 	local $^W = 0;
-	my $val = $dbh->quote( $qt_vals[$x] );	
+	my $val = $dbh->quote( $qt_vals[$x] );
 	is( $val, $expt_vals[$x], "$x: quote on $qt_vals[$x] returned $val" );
 }
 
@@ -150,7 +150,7 @@ ok ($dbh->ping, "Ping the current connection ..." );
 #	SQL_TABLE_TERM
 #	SQL_USER_NAME
 
-foreach my $info (sort keys %$get_info) 
+foreach my $info (sort keys %$get_info)
 {
 	my $type =  $dbh->get_info($get_info->{$info});
 	ok( defined $type,  "get_info($info) ($get_info->{$info}) $type" );
@@ -239,7 +239,7 @@ SKIP: {
 		while( my $row = $sth->fetchrow_arrayref ) {
 			{
 				local $^W = 0;
-				print join( ", ", @$row, "\n" );	
+				print join( ", ", @$row, "\n" );
 			}
 		}
 

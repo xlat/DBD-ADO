@@ -1,5 +1,5 @@
 use DBI();
-use DBD::ADO();
+use DBD::ADO::TypeInfo();
 
 $\ = "\n";
 $, = " | ";

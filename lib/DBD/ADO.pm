@@ -10,7 +10,7 @@
 		use vars qw($err $errstr $state $drh $VERSION @EXPORT);
 
     @EXPORT = ();
-    $VERSION = '2.71';
+    $VERSION = '2.72';
 
 #
 #   Copyright (c) 1999, Phlip & Tim Bunce
@@ -96,68 +96,6 @@ my $VT_I4_BYREF;
 #my $ado_sptype;
 my %connect_options;
 
-package DBD::ADO::TypeInfo;
-
-use Win32::OLE();
-use Win32::OLE::TypeInfo();
-
-my $ProgId  = 'ADODB.Connection';
-my $VarSkip = Win32::OLE::TypeInfo::VARFLAG_FHIDDEN()
-            | Win32::OLE::TypeInfo::VARFLAG_FRESTRICTED()
-            | Win32::OLE::TypeInfo::VARFLAG_FNONBROWSABLE()
-            ;
-my $Enums;
-
-# -----------------------------------------------------------------------------
-sub Enums
-# -----------------------------------------------------------------------------
-{
-  my $class = shift;
-
-  return $Enums if $Enums;
-
-  my $TypeLib = Win32::OLE->new( $ProgId )->GetTypeInfo->GetContainingTypeLib;
-
-  for my $i ( 0 .. $TypeLib->_GetTypeInfoCount - 1 )
-  {
-    my $TypeInfo = $TypeLib->_GetTypeInfo( $i );
-    my $TypeAttr = $TypeInfo->_GetTypeAttr;
-    next unless $TypeAttr->{typekind} == Win32::OLE::TypeInfo::TKIND_ENUM();
-    my $Enum = $Enums->{$TypeInfo->_GetDocumentation->{Name}} = {};
-    for my $i ( 0 .. $TypeAttr->{cVars} - 1 )
-    {
-      my $VarDesc = $TypeInfo->_GetVarDesc( $i );
-      next if $VarDesc->{wVarFlags} & $VarSkip;
-      my $Documentation = $TypeInfo->_GetDocumentation( $VarDesc->{memid} );
-      $Enum->{$Documentation->{Name}} = $VarDesc->{varValue};
-    }
-  }
-  return $Enums;
-}
-# -----------------------------------------------------------------------------
-
-=head1 NAME
-
-Local::DBI::ADO::TypeInfo - ADO TypeInfo
-
-=head1 SYNOPSIS
-
-  use Local::DBI::ADO::TypeInfo();
-
-  $\ = "\n";
-
-  my $Enums = Local::DBI::ADO::TypeInfo->Enums;
-
-  for my $Enum ( sort keys %$Enums )
-  {
-    print $Enum;
-    for my $Const ( sort keys %{$Enums->{$Enum}} )
-    {
-      printf "  %-35s 0x%X\n", $Const, $Enums->{$Enum}{$Const};
-    }
-  }
-
-=cut
 
 {   package DBD::ADO::dr; # ====== DRIVER ======
 

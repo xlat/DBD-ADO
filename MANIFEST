@@ -7,6 +7,7 @@ ex/OpenSchema.pl
 ex/Provider.pl
 lib/DBD/ADO.pm
 lib/DBD/ADO/GetInfo.pm
+lib/DBD/ADO/TypeInfo.pm
 t/01base.t
 t/02simple.t
 t/03dbatt.t
