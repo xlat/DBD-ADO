@@ -9,7 +9,7 @@
   use strict;
   use vars qw($err $errstr $state $drh $VERSION);
 
-  $VERSION = '2.75';
+  $VERSION = '2.76';
 
 # Copyright (c) 1998, Tim Bunce
 # Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
@@ -254,17 +254,6 @@ my %connect_options;
 		  "Can't connect to '$dsn': $lastError")
 	    if $lastError;
 
-	# Remember, Tom, or-ing them works much better.
-	my $att =
-		$ado_consts->{adXactCommitRetaining} |
-		$ado_consts->{adXactAbortRetaining};
-
-	$conn->{Attributes} = $att;
-	$lastError = DBD::ADO::errors($conn);
-	return $drh->set_err( $DBD::ADO::err || -1,
-			"Failed setting CommitRetaining: $lastError")
-		if $lastError;
-
 	# Determine if the provider supports transaction.
 	my $auto = 0;
 	eval {
@@ -302,14 +291,6 @@ my %connect_options;
 
 	$drh->trace_msg( "->> Transaction support: $auto " .
 		$this->{ado_provider_auto_commit_comments} . "\n",1);
-	# If transaction are not supported, why execute.
- 	if ($auto) {
-		$conn->BeginTrans;
-		$lastError = DBD::ADO::errors($conn);
-		return $drh->set_err( $DBD::ADO::err || -1,
-			"Begin Transaction Failed: $lastError")
-		if $lastError;
-	}
 
 	# As a last step, add the ado_consts to the object.
 	$this->{ado_consts} = $ado_consts;
@@ -330,8 +311,6 @@ my %connect_options;
 			my $conn = $self->{ado_conn};
 			my $auto = $self->{AutoCommit};
 			if (defined $conn) {
-				$conn->CommitTrans if $auto
-					and $self->{ado_provider_support_auto_commit};
 				$conn->RollbackTrans unless $auto
 					and not $self->{ado_provider_support_auto_commit};
 			my $lastError = DBD::ADO::errors($conn);
@@ -394,6 +373,16 @@ my @sql_types_supported = ();
 				if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
 			return carp $dbh->{ado_provider_auto_commit_comments}
 				unless $dbh->{ado_provider_support_auto_commit};
+      if ( $dbh->FETCH('BegunWork') ) {
+        $dbh->{AutoCommit} = 1;
+        $dbh->SUPER::STORE('BegunWork', 0 );
+        my $conn = $dbh->{ado_conn};
+        $conn->{Attributes} = 0;
+        my $lastError = DBD::ADO::errors($conn);
+        return $dbh->set_err( $DBD::ADO::err || -1,
+          "Failed setting CommitRetaining: $lastError")
+        if $lastError;
+      }
 			if (exists $dbh->{ado_conn} and defined $dbh->{ado_conn} and
 				$dbh->{ado_conn}->{State} & $ado_consts->{adStateOpen}) {
 					$dbh->{ado_conn}->RollbackTrans;
@@ -422,9 +411,6 @@ my @sql_types_supported = ();
 
 				$dbh->trace_msg( "<- modified connection Attributes " . $conn->{Attributes} . "\n");
 				$dbh->trace_msg( "<- AutoCommit -> $auto  Provider Support -> $dbh->{ado_provider_support_auto_commit} Comments -> $dbh->{ado_provider_auto_commit_comments}\n");
-		$dbh->{ado_provider_auto_commit_comments} =
-				$conn->CommitTrans if $auto and
-					$dbh->{ado_provider_support_auto_commit};
 
 				$conn->RollbackTrans unless $auto and
 					not $dbh->{ado_provider_support_auto_commit};
@@ -454,6 +440,16 @@ my @sql_types_supported = ();
 				if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
 			return carp $dbh->{ado_provider_auto_commit_comments}
 				unless $dbh->{ado_provider_support_auto_commit};
+      if ( $dbh->FETCH('BegunWork') ) {
+        $dbh->{AutoCommit} = 1;
+        $dbh->SUPER::STORE('BegunWork', 0 );
+        my $conn = $dbh->{ado_conn};
+        $conn->{Attributes} = 0;
+        my $lastError = DBD::ADO::errors($conn);
+        return $dbh->set_err( $DBD::ADO::err || -1,
+          "Failed setting CommitRetaining: $lastError")
+        if $lastError;
+      }
 			if (exists $dbh->{ado_conn} and defined $dbh->{ado_conn} and
 				$dbh->{ado_conn}->{State} == $ado_consts->{adStateOpen}) {
 
@@ -1488,24 +1484,37 @@ my @sql_types_supported = ();
         # return $dbh->DBD::_::db::STORE($attrib, $value);
     }
 
-		# Rules for auto commit, if here, the provider supports.
-		# If auto commit is off and new value is on, commit the
-		# current transaction and start a new.
-		# If auto commit is on and new value is off, no immediate effect
-		# is needed.
-		sub _auto_commit {
-			my ($dbh, $value) = @_;
+  sub _auto_commit {
+    my ( $dbh, $value ) = @_;
 
-			my $cv = $dbh->FETCH('AutoCommit') || 0;
-			if ($cv eq 0 and $value eq 1) { # Current off, turn on
-				$dbh->commit;
-				return 1;
-			} elsif ($cv eq 1 and $value eq 0) {
-				return 0;
-			}
-			# Didn't change the value.
-			return $cv;
-		}
+    my $cv = $dbh->FETCH('AutoCommit') || 0;
+
+    if ( !$cv && $value ) { # Current off, turn on
+      my $conn = $dbh->{ado_conn};
+      $conn->{Attributes} = 0;
+      my $lastError = DBD::ADO::errors($conn);
+      return $dbh->set_err( $DBD::ADO::err || -1,
+        "Failed setting CommitRetaining: $lastError")
+      if $lastError;
+      $dbh->commit;
+      return 1;
+    } elsif ( $cv && !$value ) {
+      my $conn = $dbh->{ado_conn};
+      $conn->{Attributes} = $dbh->{ado_consts}{adXactCommitRetaining}
+                          | $dbh->{ado_consts}{adXactAbortRetaining};
+      my $lastError = DBD::ADO::errors($conn);
+      return $dbh->set_err( $DBD::ADO::err || -1,
+        "Failed setting CommitRetaining: $lastError")
+      if $lastError;
+      $conn->BeginTrans;
+      $lastError = DBD::ADO::errors($conn);
+      return $dbh->set_err( $DBD::ADO::err || -1,
+        "Begin Transaction Failed: $lastError")
+        if $lastError;
+      return 0;
+    }
+    return $cv;  # Didn't change the value.
+  }
 
     sub DESTROY {  # Database handle
 			my ($dbh) = @_;
@@ -1544,9 +1553,6 @@ my @sql_types_supported = ();
 
 					$dbh->trace_msg( "<- modified connection Attributes " . $conn->{Attributes} . "\n");
 					$dbh->trace_msg( "<- AutoCommit -> $auto  Provider Support -> $dbh->{ado_provider_support_auto_commit} Comments -> $dbh->{ado_provider_auto_commit_comments}\n");
-					$dbh->{ado_provider_auto_commit_comments} =
-					$conn->CommitTrans if $auto and
-						$dbh->{ado_provider_support_auto_commit};
 
 					$conn->RollbackTrans unless $auto and
 						not $dbh->{ado_provider_support_auto_commit};
@@ -1846,16 +1852,6 @@ my @sql_types_supported = ();
 			my $num_of_fields = @$ado_fields;
 
 			if ($num_of_fields == 0) {	# assume non-select statement
-
-					# If the AutoCommit is on, Commit current transaction.
-					$conn->CommitTrans
-						if $sth->{ado_dbh}->{AutoCommit}
-							and $sth->{ado_dbh}->{ado_provider_support_auto_commit};
-					$lastError = DBD::ADO::errors($conn);
-					return $sth->set_err( $DBD::ADO::err || -1,
-							"Execute: Commit failed: $lastError")
-						if $lastError;
-
 
 					# Determine the effected row count?
 					my $c = ($rows->Value == 0 ? qq{0E0} : $rows->Value);

@@ -10,12 +10,10 @@ use strict;
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 29;
+	plan tests => 25;
 } else {
 	plan skip_all => 'Cannot test without DB info';
 }
-
-my ($pf, $sf);
 
 my @row;
 
@@ -25,23 +23,6 @@ my $dbh = DBI->connect() || die "Connect failed: $DBI::errstr\n";
 pass( "Connection established" );
 
 #### testing set/get of connection attributes
-
-my $rc = 0;
-
-$dbh->{'AutoCommit'} = 1;
-$rc = commitTest($dbh);
-print " ", $DBI::errstr, "" if ($rc < 0);
-ok( $rc == 1, "Commit Test, AutoCommit ON" );
-
-ok( defined $dbh->{AutoCommit}, "AutoCommit attribute" );
-
-$dbh->{'AutoCommit'} = 0;
-$rc = commitTest($dbh);
-print $DBI::errstr, "\n" if ($rc < 0);
-ok( $rc == 0, "Commit Test, AutoCommit OFF" );
-ok( $dbh->{'AutoCommit'} = 1, "Set AutoCommit ON" );
-
-# ------------------------------------------------------------
 
 my $rows = 0;
 
@@ -78,13 +59,13 @@ my @attribs = qw{
 	RowsInCache
 };
 
-eval { 
+eval {
 	my $val = $sth->{BadAttributeHere};
 };
 ok( $@, " Statement attribute: BadAttributeHere" );
 
 foreach my $attrib (sort @attribs) {
-	eval { 
+	eval {
 		my $val = $sth->{$attrib};
 	};
 	ok( !$@, " Statement attribute: $attrib" );
@@ -98,51 +79,3 @@ $sth->finish;
 
 
 ok( !$dbh->disconnect(), "Disconnect, tests completed" );
-
-# ------------------------------------------------------------
-# returns true when a row remains inserted after a rollback.
-# this means that autocommit is ON. 
-# ------------------------------------------------------------
-sub commitTest {
-    my $dbh = shift;
-    my @row;
-    my $rc = -1;
-    my $sth;
-		# Determine if an escape sequence is usable.
-		foreach (DBI::SQL_DATE(), DBI::SQL_TIMESTAMP()) {
-			@row = $dbh->type_info($_);
-			last if @row;
-		}
-		my $r = shift @row;
-		$pf = $r->{LITERAL_PREFIX};
-		$sf = $r->{LITERAL_SUFFIX};
-		$pf = qq/{d \'/ unless $pf; #'
-		$sf = qq/\' }/  unless $sf; #'
-
-    $dbh->do("DELETE FROM $ADOTEST::table_name WHERE A = 100") or return undef;
-
-    { # suppress the "commit ineffective" warning
-      local($SIG{__WARN__}) = sub { };
-      $dbh->commit();
-    }
-
-		my $dt = qq{${pf}1997-01-01${sf}};
-    $dbh->do("insert into $ADOTEST::table_name values(100, 'x', 'y', $dt)");
-    { # suppress the "rollback ineffective" warning
-	  local($SIG{__WARN__}) = sub { };
-      $dbh->rollback();
-    }
-    $sth = $dbh->prepare("SELECT A FROM $ADOTEST::table_name WHERE A = 100");
-    $sth->execute();
-    if (@row = $sth->fetchrow()) {
-        $rc = 1;
-    }
-    else {
-	$rc = 0;
-    }
-    $sth->finish();
-    $rc;
-}
-
-# ------------------------------------------------------------
-

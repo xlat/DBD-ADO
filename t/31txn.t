@@ -1,0 +1,91 @@
+#!perl -I./t
+
+$| = 1;
+
+use strict;
+use warnings;
+use DBI();
+use ADOTEST();
+
+use Test::More;
+
+if ( defined $ENV{DBI_DSN} ) {
+  plan tests => 18;
+} else {
+  plan skip_all => 'Cannot test without DB info';
+}
+
+pass('Transaction / AutoCommit tests');
+
+my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
+   $dbh->{RaiseError} = 1;
+   $dbh->{PrintError} = 0;
+pass('Database connection created');
+
+for ('rollback','commit')
+{
+  my $Warning;
+  local $SIG{__WARN__} = sub { $Warning = $_[0]; chomp $Warning; };
+  local $dbh->{Warn} = 1;
+  $dbh->$_;
+  like( $Warning, qr/ineffective/, "Warning expected: $Warning");
+}
+ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $ADOTEST::table_name");
+
+$dbh->{AutoCommit} = 1;
+ok( $dbh->{AutoCommit}, "AutoCommit ON: $dbh->{AutoCommit}");
+
+is( commitTest( $dbh ), 1,'Commit Test, AutoCommit ON');
+
+$dbh->{AutoCommit} = 0;
+ok( !$dbh->{AutoCommit}, "AutoCommit OFF: $dbh->{AutoCommit}");
+
+is( commitTest( $dbh ), 0,'Commit Test, AutoCommit OFF');
+
+$dbh->{AutoCommit} = 1;
+ok( $dbh->{AutoCommit}, "AutoCommit ON: $dbh->{AutoCommit}");
+
+is( commitTest( $dbh ), 1,'Commit Test, AutoCommit ON');
+
+ok( $dbh->begin_work, 'begin_work');
+ok( $dbh->{BegunWork}, 'BegunWork ON');
+ok( !$dbh->{AutoCommit}, 'AutoCommit OFF');
+$dbh->rollback;  # XXX: ok( $dbh->rollback, 'rollback');
+ok( !$dbh->{BegunWork}, 'BegunWork OFF');
+ok( $dbh->{AutoCommit}, 'AutoCommit ON');
+
+$dbh->do("DROP TABLE $ADOTEST::table_name");
+pass("DROP TABLE $ADOTEST::table_name");
+
+$dbh->disconnect;
+pass('disconnect');
+
+# -----------------------------------------------------------------------------
+# Returns true when a row remains inserted after a rollback.
+# This means that AutoCommit is ON.
+# -----------------------------------------------------------------------------
+sub commitTest {
+  my $dbh = shift;
+  my $tbl = $ADOTEST::table_name;
+
+  $dbh->do("DELETE FROM $tbl WHERE A = 100") or return undef;
+  {
+    local $SIG{__WARN__} = sub {}; # suppress the "commit ineffective" warning
+    local $dbh->{RaiseError} = 0;
+    $dbh->commit;
+  }
+  $dbh->do("INSERT INTO $tbl( A, B ) VALUES( 100,'T100')");
+  {
+    local $SIG{__WARN__} = sub {}; # suppress the "rollback ineffective" warning
+    local $dbh->{RaiseError} = 0;
+    $dbh->rollback;
+  }
+  my $sth = $dbh->prepare("SELECT A, B FROM $tbl WHERE A = 100");
+  $sth->execute;
+  my $rc = 0;
+  while ( my $row = $sth->fetch ) {
+    print "-- @$row\n";
+    $rc = 1;
+  }
+  $rc;
+}

@@ -1,5 +1,5 @@
 
-Improve Txn, AutoCommit and the like.
+Adjust return codes wrt the spec
 
 Improve bind_param for types other than Varchar, add more tests.
 
