@@ -29,7 +29,7 @@ my $tbl = $ADOTEST::table_name;
 {
   my $sth;
 
-  eval { $sth = $dbh->column_info };
+  eval { $sth = $dbh->column_info( undef, undef, undef, undef ) };
   ok( (!$@ and defined $sth ),'column_info tested');
   $sth = undef;
 }
@@ -42,7 +42,7 @@ my $tbl = $ADOTEST::table_name;
   is( uc $row->[ 3], 'B','Is this column name B?');
 }
 {
-  my $sth = $dbh->column_info( undef, undef, $tbl );
+  my $sth = $dbh->column_info( undef, undef, $tbl, undef );
   ok( defined $sth,'Statement handle defined');
 
   my @ColNames = sort keys %ADOTEST::TestFieldInfo;

@@ -1,5 +1,4 @@
 #!perl -I./t
-# vim:ts=2:sw=2:ai:aw:nu:
 
 $| = 1;
 
@@ -23,7 +22,7 @@ ok ( defined $dbh, 'Connection');
 SKIP: {
   local ($dbh->{Warn}, $dbh->{PrintError});
   $dbh->{PrintError} = $dbh->{Warn} = 0;
-  my $sth = $dbh->foreign_key_info;
+  my $sth = $dbh->foreign_key_info( undef, undef, undef, undef, undef, undef );
   my $non_supported = '-2146825037';
   skip 'foreign_key_info not supported by provider', 1
     if $dbh->err && $dbh->err == $non_supported;

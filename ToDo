@@ -1,6 +1,4 @@
 
-Let $dbh->{ado_ti_ver} default to 2.
-
 Adjust return codes wrt the spec
 
 Change tests to use bind_param() more often.
