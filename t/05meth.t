@@ -13,7 +13,7 @@ print "ok 1\n";
 my $dbh = DBI->connect() || die "Connect failed: $DBI::errstr\n";
 print "ok 2\n";
 
-#### testing Tim's early draft DBI methods
+#### testing Tim's early draft DBI methods #'
 
 my $r1 = $DBI::rows;
 $dbh->{AutoCommit} = 0;
@@ -89,10 +89,5 @@ $sth->finish();
 $dbh->{RaiseError} = 0;
 $dbh->{PrintError} = 0;
 $dbh->disconnect();
-
-# make sure there is an invalid transaction state error at the end here.
-# (XXX not reliable, iodbc-2.12 with "INTERSOLV dBase IV ODBC Driver" == -1)
-#print "# DBI::err=$DBI::err\nnot " if $DBI::err ne "25000";
-#print "ok 7\n"; 
 
 BEGIN { $::tests = 6; }

@@ -86,14 +86,14 @@ sub tab_insert {
 	my ($pf, $sf);
 	$pf = $r->{LITERAL_PREFIX};
 	$sf = $r->{LITERAL_SUFFIX};
-	$pf = qq/{d \'/ unless $pf;
-	$sf = qq/\' }/  unless $sf;
+	$pf = qq/{d \'/ unless $pf; # '
+	$sf = qq/\' }/  unless $sf; # '
 	# qeDBF needs a space after the table name!
 
 	#print "Building dates using: $pf $sf\n";
 
-	$pf =~ s/\'$//;
-	$sf =~ s/^\'//;
+	$pf =~ s/\'$//; # '
+	$sf =~ s/^\'//; # '
 	#print qq{${pf}1998-05-10${sf}};
 
 	#INSERT INTO $ADOTEST::table_name (A, B, C, D) VALUES (?, ?, ?, ${pf}?${sf})
@@ -118,7 +118,8 @@ sub tab_insert {
 	$sth->bind_param(3, $_->[2], { TYPE => $row[0]->{DATA_TYPE}});
 
 	@row = ADOTEST::get_type_for_column($dbh, 'D');
-	my $dt = ($_->[$row[1] == SQL_DATE ? 3 : 4 ]);
+	my $dt = ($_->[$row[0]->{DATA_TYPE} == SQL_DATE ? 3 : 4 ]);
+	# my $dt = ($_->[$row[1] == SQL_DATE ? 3 : 4 ]);
 	$sth->bind_param(4, $dt, { TYPE => $row[0]->{DATA_TYPE}});
 	return 0 unless $sth->execute;
     }

@@ -73,7 +73,8 @@ sub tab_create {
 	    $fields .= "$f ";
 	    print "-- $fields\n";
 	    my @row = get_type_for_column($dbh, $f);
-			shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/;
+			shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/i;
+			shift @row if ($row[0])->{TYPE_NAME} =~ /nclob/i;
 			my $rchk = ($row[0])->{DATA_TYPE};
 			
 			$r = shift @row;
@@ -154,18 +155,25 @@ sub tab_long_create {
 			$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{, 0)} 
 		if ($r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i);
   }
+
+	# Determine the "long" type here.
 	@row = $dbh->type_info( $type_num );
-	$fields .= ", ";
-	$fields .= "$col_name ";
-	shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/;
-	$r = shift @row;
-	$fields .= $r->{TYPE_NAME};
-	if ($r->{CREATE_PARAMS}) {
-		$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{)} 
-		if ($r->{CREATE_PARAMS} =~ /LENGTH/i);
-			$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{, 0)} 
-		if ($r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i);
-  }
+	foreach my $rt ( @row ) {
+		next if ( $rt->{TYPE_NAME} =~ m/nclob/i );
+		next if ( $rt->{TYPE_NAME} =~ m/raw/i );
+		next if ($row[0])->{TYPE_NAME} =~ /identity$/;
+		$fields .= ", ";
+		$fields .= "$col_name ";
+		$fields .= $rt->{TYPE_NAME};
+		if ($rt->{CREATE_PARAMS}) {
+			$fields .= qq{(} . $rt->{COLUMN_SIZE} . qq{)} 
+			if ($rt->{CREATE_PARAMS} =~ /LENGTH/i);
+				$fields .= qq{(} . $rt->{COLUMN_SIZE} . qq{, 0)} 
+			if ($rt->{CREATE_PARAMS} =~ /PRECISION,SCALE/i);
+		}
+		last;
+	}
+
 	my ($f,$r);
 	foreach $f (sort keys %LTestFieldInfo) {
 	    $fields .= ", " unless !$fields;

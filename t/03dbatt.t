@@ -2,129 +2,96 @@
 #
 # vim:ts=2:sw=2:ai:aw:nu
 $|=1;
-print "1..$tests\n";
 
 use DBI qw(:sql_types);
 use ADOTEST;
+use Test::More tests => 29;
+use strict;
+
 my ($pf, $sf);
 
 my @row;
 
-print "ok 1\n";
+pass( "Begin testing, modules loaded" );
 
 my $dbh = DBI->connect() || die "Connect failed: $DBI::errstr\n";
-print "ok 2\n";
+pass( "Connection established" );
 
 #### testing set/get of connection attributes
 
+my $rc = 0;
+
 $dbh->{'AutoCommit'} = 1;
 $rc = commitTest($dbh);
-print " ", $DBI->errstr, "" if ($rc < 0);
-print "not " unless ($rc == 1);
-print "ok 3\n";
+print " ", $DBI::errstr, "" if ($rc < 0);
+ok( $rc == 1, "Commit Test, AutoCommit ON" );
 
-print "not " unless($dbh->{AutoCommit});
-print "ok 4\n";
+ok( defined $dbh->{AutoCommit}, "AutoCommit attribute" );
 
 $dbh->{'AutoCommit'} = 0;
 $rc = commitTest($dbh);
-print $DBI->errstr, "\n" if ($rc < 0);
-print "not" unless ($rc == 0);
-print "ok 5\n";
-$dbh->{'AutoCommit'} = 1;
+print $DBI::errstr, "\n" if ($rc < 0);
+ok( $rc == 0, "Commit Test, AutoCommit OFF" );
+ok( $dbh->{'AutoCommit'} = 1, "Set AutoCommit ON" );
 
 # ------------------------------------------------------------
 
 my $rows = 0;
 # TBD: Check for tables function working.  
-$tchk = [ qw{TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS } ];
-if ($sth = $dbh->table_info()) {
-    while (@row = $sth->fetchrow()) {
+
+ok( @row = $dbh->tables(), " tables() return a list of tables." );
+
+my $tchk = [ qw{TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS } ];
+if (my $sth = $dbh->table_info()) {
+    while (my @row = $sth->fetchrow()) {
         $rows++;
     }
     $sth->finish();
 #		Check the columns returned from table_info.
 	my $vtchk = $sth->{NAME};
 	for ( 0 .. $#{$tchk} ) {
-			print "Attribute: $tchk->[$_] $vtchk->[$_] ";
-		if ( $tchk->[$_] eq $vtchk->[$_] ) {
-			print "ok\n";
-		} else {
-				print "not ok\n";
-		}
+		ok ( $tchk->[$_] eq $vtchk->[$_], "Attribute: $tchk->[$_] $vtchk->[$_] " );
 	}
-	
 }
-print "tables $rows\n";
-print "not " unless $rows;
-print "ok 6\n";
+ok( $rows, "Total tables count: $rows" );
 
 $rows = 0;
 # Check if type_info_all is working.
-$rows = $dbh->type_info_all();
-print "not " unless $rows;
-print "ok 7\n";
+ok( $rows = $dbh->type_info_all(), "Check type_info_all: " );
 
-$sth = $dbh->prepare("SELECT A FROM $ADOTEST::table_name");
+my $sth = $dbh->prepare("SELECT A FROM $ADOTEST::table_name");
 # $sth = $dbh->prepare("SELECT * FROM titles where title_id = ?");
 #$sth = $dbh->prepare("SELECT * FROM titles");
 #$sth->bind_param(1, undef, SQL_VARCHAR());
 #$sth->execute('PS1372');
 $sth->execute();
 
-print "not " unless exists $sth->{NUM_OF_FIELDS};
-print "Number of Fields ", $sth->{NUM_OF_FIELDS}, "\n" if exists $sth->{NUM_OF_FIELDS};
-print "ok 8\n";
+my @attribs = qw{
+	NUM_OF_FIELDS NUM_OF_PARAMS NAME NAME_lc NAME_uc
+	PRECISION SCALE NULLABLE CursorName Statement
+	RowsInCache
+};
 
-print "not " unless exists $sth->{NUM_OF_PARAMS};
-print "Number of Parameters ", $sth->{NUM_OF_PARAMS}, "\n" if exists $sth->{NUM_OF_PARAMS};
-print "ok 9\n";
+eval { 
+	my $val = $sth->{BadAttributeHere};
+};
+ok( $@, " Statement attribute: BadAttributeHere" );
 
-print "not " unless exists $sth->{NAME};
-print "Names ", join( " ", @{$sth->{NAME}}), "\n" if exists $sth->{NAME};
-print "ok 10\n";
+foreach my $attrib (sort @attribs) {
+	eval { 
+		my $val = $sth->{$attrib};
+	};
+	ok( !$@, " Statement attribute: $attrib" );
+}
 
-print "not " unless exists $sth->{NAME_lc};
-print "Names ", join( " ", @{$sth->{NAME_lc}}), "\n" if exists $sth->{NAME_lc};
-print "ok 11\n";
-
-print "not " unless exists $sth->{NAME_uc};
-print "Names ", join( " ", @{$sth->{NAME_uc}}), "\n" if exists $sth->{NAME_uc};
-print "ok 12\n";
-
-print "not " unless exists $sth->{TYPE};
-print "Types ", join( " ", @{$sth->{TYPE}}), "\n" if exists $sth->{TYPE};
-print "ok 13\n";
-
-print "not " unless exists $sth->{PRECISION};
-print "ok 14\n";
-
-print "not " unless exists $sth->{SCALE};
-print "ok 15\n";
-
-print "not " unless exists $sth->{NULLABLE};
-
-print "ok 16\n";
-print "not " unless $sth->{CursorName};
-
-print "ok 17\n";
-print "not " unless exists $sth->{Statement};
-print "statement ", $sth->{Statement}, "\n" if exists $sth->{Statement};
-print "ok 18\n";
-
-print "not " unless $sth->{RowsInCache};
-print "ok 19\n";
+my $val = -1;
+ok($val = ($sth->{RowsInCache} = 100) , " Setting RowsInCache : $val" );
+ok(($val = $sth->{RowsInCache}) == 100, " Getting RowsInCache : $val" );
 
 $sth->finish;
 
-print "tables() \n";
-@row = $dbh->tables();
-print "not " unless @row;
-print "ok 20\n";
 
-$dbh->disconnect();
-
-BEGIN { $tests = 20; }
+ok( !$dbh->disconnect(), "Disconnect, tests completed" );
 
 # ------------------------------------------------------------
 # returns true when a row remains inserted after a rollback.

@@ -4,59 +4,48 @@ $| = 1;
 # vim:ts=2:sw=2:ai:aw:nu:
 use DBI qw(:sql_types);
 use ADOTEST;
-my ($pf, $sf);
+use strict;
 
-print "1..$tests\n";
+use vars qw($tests);
+
+use Test::More tests => 24;
+
+my $non_supported = '-2146825037';
+
+my ($pf, $sf);
 
 my ($longstr) = qq{THIS IS A STRING LONGER THAN 80 CHARS.  THIS SHOULD BE CHECKED FOR TRUNCATION AND COMPARED WITH ITSELF.};
 my ($longstr2) = $longstr . "  " . $longstr . "  " . $longstr . "  " . $longstr;
 
-print "ok 1\n";
+pass( "Begining test, modules loaded" );
 
-print " Test 2: connecting to the database\n";
 my $dbh = DBI->connect() or die "Connect failed: $DBI::errstr\n";
-print "ok 2\n";
+pass( "Database connection created." );
 
 
 #### testing a simple select
 
-print " Test 3: create test table\n";
-$rc = ADOTEST::tab_create($dbh);
-print "not " unless($rc);
-print "ok 3\n";
-
-print " Test 4: check existance of test table\n";
 my $rc = 0;
-$rc = ADOTEST::tab_exists($dbh);
-print "not " unless($rc >= 0);
-print "ok 4\n";
 
-print " Test 5: insert test data\n";
-$rc = tab_insert($dbh);
-print "not " unless($rc);
-print "ok 5\n";
+ok( $rc = ADOTEST::tab_create($dbh), " create test table" );
 
-print " Test 6: select test data\n";
-$rc = tab_select($dbh);
-print "not " unless($rc);
-print "ok 6\n";
+ok( $rc = ADOTEST::tab_exists($dbh), " check existance of test table" );
 
-print " Tests 7,8: test LongTruncOk\n";
+ok( $rc = tab_insert($dbh), " insert test data" );
+
+ok( $rc = tab_select($dbh), " select test data" );
+
 $rc = undef;
 $dbh->{LongReadLen} = 50;
 $dbh->{LongTruncOk} = 1;
-$rc = select_long($dbh);
-print "not " unless($rc);
-print "ok 7\n";
+ok( ($rc = select_long($dbh)) eq 1, " test LongTruncOk ON" );
 
 $dbh->{LongTruncOk} = 0;
-$rc = select_long($dbh);
-print "not " if ($rc);
-print "ok 8\n";
+ok( ($rc = select_long($dbh)) eq undef, "test LongTruncOk OFF" );
 
 # Not implemented yet.
-print " Test 9: test Attributes\n";
-	print "ok 9\n";
+pass( " test attributes, not implemented yet" );
+
 #$sth = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A");
 
 #if ($sth) {
@@ -81,60 +70,90 @@ print " Test 9: test Attributes\n";
 	#print "not ok 9\n";
 #}
 
-print " Test 10: test \$DBI::err\n";
 $dbh->{RaiseError} = 0;
 $dbh->{PrintError} = 0;
 #
 # some ADO drivers will prepare this OK, but not execute.
 # 
-$sth = $dbh->prepare("SELECT XXNOTCOLUMN FROM $ADOTEST::table_name");
-$sth->execute() if $sth;
-print "not " if (length($DBI::err) < 1);
-print "ok 10\n";
+{
+	# Turn the warnings off at this point.  Expecting statement to fail.
+	local $dbh->{Warn} = 0;
+	my $sth = $dbh->prepare("SELECT XXNOTCOLUMN FROM $ADOTEST::table_name");
+	$sth->execute() if $sth;
+	ok( $sth->err, "Check error returned, statement handle" );
+	ok( $dbh->err, "Check error returned, database handle " );
+	ok( $DBI::err, "Check error returned, DBI::err" );
+}
 
-print " Test 11: test date values\n";
 my $dt = qq{${pf}1998-05-13${sf}};
-$sth = $dbh->prepare("SELECT D FROM $ADOTEST::table_name WHERE D > $dt");
+my $sth = $dbh->prepare("SELECT D FROM $ADOTEST::table_name WHERE D > $dt");
 $sth->execute();
 my $count = 0;
+my @row = ();
 while (@row = $sth->fetchrow) {
 	$count++ if ($row[0]);
 	# print "$row[0]\n";
 }
-print "not " if $count == 0;
-print "ok 11\n";
+ok( $count != 0, " test date value: $dt" );
 
 $sth->finish;
 
-print " Test 12: test group by queries\n";
 $sth = $dbh->prepare("SELECT A, COUNT(*) FROM $ADOTEST::table_name GROUP BY A");
 $sth->execute();
 $count = 0;
 while (@row = $sth->fetchrow) {
 	$count++ if ($row[0]);
-	print "$row[0], $row[1]\n";
+	# print "$row[0], $row[1]\n";
 }
-print "not " if $count == 0;
-print "ok 12\n";
+ok( $count != 0, " test group by queries" );
 
 $sth->finish;
 #$rc = ADOTEST::tab_delete($dbh);
 
-print " Test 13: test data_sources\n";
 my @data_sources = DBI->data_sources('ADO');
-print "Data sources:\n\t", join("\n\t",@data_sources),"\n\n";
-print "not " if ($#data_sources == 0);
-print "ok 13\n";
+# print "Data sources:\n\t", join("\n\t",@data_sources),"\n\n";
+ok( $#data_sources != 0, " test data sources ... not implemented" );
 
-print " Test 14: test creating two statement handles\n";
 my $sth1 = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A")
 	or warn $dbh->errstr;
 my $sth2 = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A")
 	or warn $dbh->errstr;
-print "not " if (not defined $sth1 and not defined $sth2);
-print "ok 14\n";
+ok( defined $sth1, "Statement handle 1 created." );
+ok( defined $sth2, "Statement handle 2 created." );
 
-BEGIN {$tests = 14;}
+$sth1 = undef; $sth2 = undef; $sth = undef;
+
+$count = 0;
+$sth1 = $dbh->prepare("SELECT * FROM $ADOTEST::table_name where A = ?")
+	or warn $dbh->errstr;
+ok( defined $sth1, "Prepared statement * and Parameter." );
+
+$sth1 = $dbh->prepare("SELECT Stuff_and_Things FROM $ADOTEST::table_name where A = ?")
+	or warn $dbh->errstr;
+ok( defined $sth1, "Prepared statement bad column and Parameter." );
+
+@row = $sth1->fetchrow;
+ok( $sth1->err , "Call to fetchrow without call to execute. " . $sth1->errstr );
+ok( scalar @row  == 0, "Call to fetchrow without call to execute, should return 0. " . scalar @row );
+
+{
+	$count = 0;
+	$sth1 = $dbh->prepare("SELECT * FROM $ADOTEST::table_name where A = ?")
+		or warn $dbh->errstr;
+	ok( defined $sth1, "Prepared statement * and Parameter." );
+
+	$sth1 = $dbh->prepare("SELECT Stuff_and_Things FROM $ADOTEST::table_name where A = ?")
+		or warn $dbh->errstr;
+	ok( defined $sth1, "Prepared statement bad column and Parameter." );
+
+	eval { 
+		local $sth1->{PrintError} = 0;
+		local $sth1->{RaiseError} = 1;
+		@row = $sth1->fetchrow;
+	};
+	ok( $@, "RaiseError caught error: $@" );
+}
+
 exit(0);
 
 sub tab_select
@@ -210,8 +229,8 @@ sub tab_insert {
 		my $r = shift @row;
 		$pf = $r->{LITERAL_PREFIX};
 		$sf = $r->{LITERAL_SUFFIX};
-		$pf = qq/{d \'/ unless $pf;
-		$sf = qq/\' }/  unless $sf;
+		$pf = qq/{d \'/ unless $pf;		# '
+		$sf = qq/\' }/  unless $sf;		# '
     # qeDBF needs a space after the table name!
 
 		print "Building dates using: $pf $sf\n";

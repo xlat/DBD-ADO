@@ -9,11 +9,13 @@
 		use vars qw($err $errstr $state $drh $VERSION @EXPORT);
 
     @EXPORT = ();
-    $VERSION = (qw{Revision: 2.1})[1];
+    $VERSION = (qw$Revision: 2.4 $)[1];
 
-#   $Id: ADO.pm,v 2.2 2001/05/26 11:35:54 talowery Exp $
+#   $Id: ADO.pm,v 2.4 2001/10/24 03:41:30 talowery Exp $
 #
 #   Copyright (c) 1999, Phlip & Tim Bunce
+#   Copyright (c) 2000, Phlip   Tim Bunce, and Thomas Lowery
+#   Copyright (c) 2001, Philp,  Tim Bunce, and Thomas Lowery
 #
 #   You may distribute under the terms of either the GNU General Public
 #   License or the Artistic License, as specified in the Perl README file.
@@ -44,8 +46,14 @@
 			my $err_ary = [];
 
 			my $lastError = Win32::OLE->LastError;
-			push @$err_ary, "\nLasterror:\t " . ($lastError+0) . ": $lastError" 
-				if $lastError;
+			if ($lastError) {
+				push @$err_ary, "\nLasterror:\t " . ($lastError+0) . ": $lastError";
+				$DBD::ADO::err = int(sprintf("%f", $lastError+0));
+			} else {
+					$DBD::ADO::err			= 0;
+					$DBD::ADO::errstr		= undef;
+					$DBD::ADO::state		= undef;
+			}
 
 			return unless ref $Conn;
 			my $Errors = $Conn->Errors();
@@ -63,11 +71,18 @@
 						"\tSource:     \t$err->{Source}",
 						"\tSQLState:   \t$err->{SQLState}");
 				}
-			#return join "\n", @$err_ary;
+				$DBD::ADO::state = $err->{SQLState}
+					if $err->{SQLState};
 			}
-		$Errors->Clear if $Errors;
-		$Conn->Errors->Clear();
-		return ($err_ary? join "\n", @$err_ary : undef);
+
+			if ($Errors) {
+				# $DBD::ADO::state = $Errors->SQLState();
+				$Errors->Clear 
+			}
+
+			$Conn->Errors->Clear() if $Conn;
+
+		return ($err_ary ? join "\n", @$err_ary : undef);
     }
 
 }
@@ -91,7 +106,10 @@ my %connect_options;
 	sub DBPROPVAL_TC_DDL_IGNORE { return 4 };
 	sub DBPROPVAL_TC_DDL_COMMIT { return 2 };
 	sub DBPROPVAL_TC_DML{ return 1 };
-	sub DBPROPVAL_TC_NONE{ return 0 };
+	# sub DBPROPVAL_TC_NONE{ return 0 };
+
+	use constant DBPROPVAL_TC_NONE => 0;
+	# sub DBPROPVAL_TC_NONE{ return 0 };
 
     sub connect { 
 			my ($drh, $dsn, $user, $auth) = @_;
@@ -112,11 +130,11 @@ my %connect_options;
 	local $Win32::OLE::Warn = 0;
 	my $conn = Win32::OLE->new('ADODB.Connection');
 	my $lastError = Win32::OLE->LastError;
-	return DBI::set_err($drh, 1,
+	return DBI::set_err($drh, $DBD::ADO::err,
 		"Can't create 'ADODB.Connection': $lastError")
 	    if $lastError;
 
-	my $this = DBI::_new_dbh($drh, {
+	my ($outer, $this) = DBI::_new_dbh($drh, {
 	    	Name => $dsn,
 	    	User => $user,
 				AutoCommit => 1,
@@ -139,8 +157,8 @@ my %connect_options;
 				Version => undef,
 			});
 
-		$this->STORE( ado_conn => $conn );
-	$drh->trace_msg( "->ADO Connection: " . ref $this->FETCH('ado_conn') . 
+	$this->{ado_conn} = $conn;
+	$drh->trace_msg( "->ADO Connection: " . ref $this->{ado_conn} . 
 		" Connection: " . ref $conn . "\n", 1);
 	##  ODBC rule - Null is not the same as an empty password...
 	$auth = '' if !defined $auth;
@@ -162,9 +180,9 @@ my %connect_options;
 		}
 	} else {
 		if($dsn =~ m/^(.*?)=(.*)$/s) {
-			$this->STORE( "ConnectionString", $dsn );
+			$outer->STORE( "ConnectionString", $dsn );
 		} else {
-			$this->STORE( "ConnectionString", "DSN=$dsn" );
+			$outer->STORE( "ConnectionString", "DSN=$dsn" );
 			push(@cdsn, $dsn);
 		}
 	}
@@ -173,7 +191,7 @@ my %connect_options;
 	$drh->trace_msg("->> Open ADO connection using $cdsn\n", 1);
 	$conn->Open ($cdsn, $user, $auth);
 	$lastError = DBD::ADO::errors($conn);
-	return DBI::set_err( $drh, 1, 
+	return DBI::set_err( $drh, $DBD::ADO::err, 
 		  "Can't connect to '$dsn': $lastError")
 	    if $lastError;
 
@@ -184,7 +202,7 @@ my %connect_options;
 
 	$conn->{Attributes} = $att;
 	$lastError = DBD::ADO::errors($conn);
-	return DBI::set_err( $conn, 1, 
+	return DBI::set_err( $conn, $DBD::ADO::err, 
 			"Failed setting CommitRetaining: $lastError")
 		if $lastError;
 
@@ -229,12 +247,12 @@ my %connect_options;
  	if ($auto) {
 		$conn->BeginTrans;
 		$lastError = DBD::ADO::errors($conn);
-		return DBI::set_err( $this, 1, 
+		return DBI::set_err( $this, $DBD::ADO::err, 
 			"Begin Transaction Failed: $lastError")
 		if $lastError;
 	}
 
-	return $this;
+	return $outer;
 	}
 
     sub disconnect_all { }
@@ -248,7 +266,7 @@ my %connect_options;
 				$conn->RollbackTrans unless $auto 
 					and not $self->{ado_provider_support_auto_commit};
 			my $lastError = DBD::ADO::errors($conn);
-			return DBI::set_err( $self, 1, "Failed to Destory: $lastError") 
+			return DBI::set_err( $self, $DBD::ADO::err, "Failed to Destory: $lastError") 
 				if $lastError;
 			}
 		}
@@ -308,7 +326,7 @@ my $ado_type;
 				$dbh->{ado_conn}->{State} & $ado_consts->{adStateOpen}) {
 					$dbh->{ado_conn}->RollbackTrans;
 					my $lastError = DBD::ADO::errors($dbh->{ado_conn});
-					return DBI::set_err( $dbh, 1,
+					return DBI::set_err( $dbh, $DBD::ADO::err,
 						"Failed to Rollback Trans: $lastError") 
 					if $lastError;
 			}
@@ -325,7 +343,7 @@ my $ado_type;
 				# does not start another transaction.
 				$conn->{Attributes} = 0;
 				my $lastError = DBD::ADO::errors($conn);
-				return DBI::set_err( $conn, 1, 
+				return DBI::set_err( $conn, $DBD::ADO::err, 
 						"Failed setting CommitRetaining: $lastError") #-2147168242
 				if $lastError and $lastError !~ m/-2147168242/;
 
@@ -339,15 +357,19 @@ my $ado_type;
 					not $dbh->{ado_provider_support_auto_commit};
 
 				$lastError = DBD::ADO::errors($conn);
-				return DBI::set_err( $dbh, 1, "Failed to disconnect: $lastError") 
+				return $dbh->DBI::set_err( $DBD::ADO::err, "Failed to execute rollback: $lastError") 
 					if $lastError and $lastError !~ m/-2147168242/;
+				# Provider error about transaction not started.  Ignore message, 
+				# clear error codes.
+				DBD::ADO::errors($conn) if ($lastError and $lastError =~ m/-2147168242/);
 
 				$conn->Close;
 				$conn = undef;
 				$dbh->{ado_conn} = undef;
 			}
 
-			$dbh->STORE( ado_conn => undef );
+			$dbh->{ado_conn} = undef if defined $dbh->{ado_conn};
+			return;
 		}
 
 		# Commit to the database.
@@ -363,67 +385,105 @@ my $ado_type;
 
 				$dbh->{ado_conn}->CommitTrans;
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
-				return DBI::set_err( $dbh, 1, "Failed to CommitTrans: $lastError") 
+				return DBI::set_err( $dbh, $DBD::ADO::err, "Failed to CommitTrans: $lastError") 
 					if $lastError;
 			}
 		}
 
     sub prepare {
 			my($dbh, $statement, $attribs) = @_;
-			my $conn = $dbh->FETCH("ado_conn");
+			my $conn = $dbh->{ado_conn};
 
 
 			$dbh->trace_msg( "-> create a new statement handler\n");
 
 			my $comm = Win32::OLE->new('ADODB.Command');
 			my $lastError = Win32::OLE->LastError;
-			return DBI::set_err($dbh, 1,
+			return DBI::set_err($dbh, $DBD::ADO::err,
 				"Can't create 'object ADODB.Command': $lastError")
 	    if $lastError;
 
 			$comm->{ActiveConnection} = $conn;
 			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($dbh, 1,
+			return DBI::set_err($dbh, $DBD::ADO::err,
 				"Unable to set ActiveConnection 'ADODB.Command': $lastError")
 	    if $lastError;
 
 			$comm->{CommandText} = $statement;
 			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($dbh, 1,
+			return DBI::set_err($dbh, $DBD::ADO::err,
 				"Unable to set CommandText 'ADODB.Command': $lastError")
 	    if $lastError;
 
 			my $ct = $attribs->{CommandType}? $attribs->{CommandType}: "adCmdText";
 			$comm->{CommandType} = $ado_consts->{$ct};
 			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($dbh, 1,
+			return DBI::set_err($dbh, $DBD::ADO::err,
 				"Unable to set command type 'ADODB.Command': $lastError")
 	    if $lastError;
 
+				# NAME					=> undef,
+				#,TYPE					=> undef,
+				#,PRECISION		=> undef,
+				#,SCALE				=> undef,
+				#,NULLABLE			=> undef,
+				#	 LongReadLen	=> 0,
+				#	,LongTruncOk	=> 0,
+				#	,CursorName		=> undef,
+				#	,RowsInCache	=> 0,
+			# my ($outer, $sth) = DBI::_new_sth($dbh, {
+	    # 		 Statement   	=> $statement,
 
+			my ($outer, $sth) = $dbh->DBI::_new_sth( { 
+						 Statement   	=> $statement 
+						,NAME					=> undef
+						,TYPE					=> undef
+						,PRECISION		=> undef
+						,SCALE				=> undef
+						,NULLABLE			=> undef
+						,CursorName		=> undef
+						,RowsInCache	=> 0
+				}, {
+						 ado_comm			=> $comm
+						,ado_conn 		=> $conn
+						,ado_current_row_count => 0,
+						,ado_dbh			=> $dbh
+						,ado_fields		=> undef,
+						,ado_params		=> [],
+						,ado_refresh	=> 1,
+						,ado_rowset		=> undef,
+						,ado_attribs	=> $attribs
+				});
 
-			my ($outer, $sth) = DBI::_new_sth($dbh, {
-	    		'Statement'   => $statement, 
-					LongReadLen		=> 0,
-					LongTruncOk		=> 0,
-					CursorName		=> undef,
-					RowsInCache		=> 0,
-					ado_comm			=> undef,
-					ado_conn 			=> undef,
-					ado_dbh				=> undef,
-					ado_params		=> [],
-					ado_rowset		=> undef,
-					ado_refresh		=> 1,
-					ado_current_row_count => 0,
-			});
+			$outer->STORE( LongReadLen	=> 0 );
+			$outer->STORE( LongTruncOk	=> 0 );
+			$outer->STORE( RowsInCache	=> 0 );
+			$outer->STORE( NUM_OF_PARAMS=> 0 );
+
+			$sth->{ado_comm}		= $comm;
+			$sth->{ado_conn}		= $conn;
+			$sth->{ado_current_row_count} = 0;
+			$sth->{ado_dbh}			= $dbh;
+			$sth->{ado_fields}	= undef;
+			$sth->{ado_params}	= [];
+			$sth->{ado_refresh}	= 1;
+			$sth->{ado_rowset}	= undef;
+			$sth->{ado_attribs}	= $attribs;
 
 #			Determine if Refresh is supported.  If the call returns
 #			an error, then Parameters->Refresh is not supported.
-			$comm->Parameters->Refresh() if $sth->FETCH(q{ado_refresh});
-			$lastError = DBD::ADO::errors($conn);
-			if (!$sth->FETCH(q{ado_refresh}) or $lastError) {
-				$sth->STORE( 'NUM_OF_PARAMS', _params($statement));
-				$sth->STORE( 'ado_refresh' => 0 );
+			if ($sth->{ado_refresh}) {
+				eval {
+					local $Win32::OLE::Warn = 0;
+					$comm->Parameters->Refresh();
+					$lastError = DBD::ADO::errors($conn);
+					die $lastError if $lastError;
+				};
+				 $sth->{ado_refresh} = 0 if $@;
+			}
+	
+			if ($sth->{ado_refresh} == 0) {
+				$outer->STORE( 'NUM_OF_PARAMS', _params($statement));
 				my $params = $sth->FETCH( 'NUM_OF_PARAMS');
 				if ($params > 0) {
 					for ( 0 .. ($params - 1)) {
@@ -434,26 +494,28 @@ my $ado_type;
 								1,
 								"");
 						my $lastError = DBD::ADO::errors($conn);
-						return DBI::set_err( $sth, 1, 
+						return $sth->DBI::set_err( $DBD::ADO::err, 
 		  				"Unable to CreateParameter: $lastError")
 	    			if $lastError;
 
 						$comm->Parameters->Append($parm);
 						$lastError = DBD::ADO::errors($conn);
-						return DBI::set_err( $sth, 1, 
+						return $sth->DBI::set_err( $DBD::ADO::err, 
 		  				"Append parameter failed : $lastError")
 	    			if $lastError;
 					}
+				} else {
+					$sth->trace_msg("\t-> prepare: statement contains no parameters\n");
 				}
 			} else {
-				$sth->STORE( 'NUM_OF_PARAMS' => $comm->Parameters->Count );
-				$sth->STORE( 'ado_refresh' => 1 );
+				$outer->STORE( 'NUM_OF_PARAMS' => $comm->Parameters->Count );
+				$sth->{ado_refresh} = 1;
 #				Describe the Parameters.
 				if ($comm->Parameters->Count) {
 				my $cnt = 0;
 				while ($cnt < $comm->Parameters->Count) {
 					my $x = $comm->Parameters->Item($cnt);
-					$dbh->trace_msg( "-> prepare: Name: " .
+					$dbh->trace_msg( "-> parameter : Name: " .
 						$x->{Name} .
 						" Type: " .
 						$x->{Type} .
@@ -464,64 +526,82 @@ my $ado_type;
 						"\n");
 						$cnt++;
 				}
+					$sth->trace_msg( "<-paramters: " );
 				} else {
-						$sth->trace_msg("-> prepare: statement contains no parameters\n");
+						$sth->trace_msg("\t-> prepare: statement contains no parameters\n");
 				}
-#				Only preparing a statement if it contains parameters.
-				$comm->{Prepared} = 1;
-				$lastError = DBD::ADO::errors($conn);
-				return DBI::set_err($dbh, 1,
-					"Unable to set prepared 'ADODB.Command': $lastError")
-	    	if $lastError;
 			}
 
-			$sth->STORE( 'CursorName' => undef );
-			$sth->STORE( 'RowsInCache' => 0 );
+#			Only preparing a statement if it contains parameters.
+			$comm->{Prepared} = 1;
+			$lastError = DBD::ADO::errors($conn);
+			return DBI::set_err($dbh, $DBD::ADO::err,
+				"Unable to set prepared 'ADODB.Command': $lastError")
+	    if $lastError;
 
-			$sth->STORE( 'ado_params', [] );
-			$sth->STORE( ado_conn => $conn );
-			$sth->STORE( ado_comm => $comm );
-			$sth->STORE( ado_dbh  => $dbh );
+			$dbh->trace_msg( "<- created a new statement handler\n");
 
-		return $outer;
-    }
+			return $outer;
+    } # prepare
 		#
 		# Creates a Statement handle from a row set.
 		#
     sub _rs_sth_prepare {
 			my($dbh, $rs, $attribs) = @_;
 
+			$dbh->trace_msg( "-> _rs_sth_prepare: Create statement handle from RecordSet\n" );
+
 			my $conn = $dbh->FETCH("ado_conn");
 			my $rows;
 
+			my $ado_fields = [ Win32::OLE::in($rs->Fields) ];
+
 			my ($outer, $sth) = DBI::_new_sth($dbh, {
-	    		'Statement'   => $attribs,
-					LongReadLen		=> 0,
-					LongTruncOk		=> 0,
-					CursorName		=> undef,
-					RowsInCache		=> 0,
-					ado_comm			=> undef,
-					ado_conn 			=> undef,
-					ado_rowset		=> $rs,
-					ado_fields		=> undef,
-					ado_dbh				=> undef,
-					ado_params		=> [],
+					 NAME					=> [ map { $_->Name } @$ado_fields ]
+					,TYPE					=> [ map { $_->Type } @$ado_fields ]
+					,PRECISION		=> [ map { $_->Precision } @$ado_fields ]
+					,SCALE				=> [ map { $_->NumericScale } @$ado_fields ]
+					,NULLABLE			=> [ map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1 : 0 } @$ado_fields ] 
+	    		,Statement		=> $rs->Source
+					,LongReadLen	=> 0
+					,LongTruncOk	=> 0
+					,CursorName		=> undef
+					,RowsInCache	=> 0
+				}, {
+					 ado_attribs	=> $attribs
+					,ado_comm			=> $conn
+					,ado_conn 		=> $conn
+					,ado_current_row_count => 0
+					,ado_dbh			=> $dbh
+					,ado_fields		=> $ado_fields
+					,ado_params		=> []
+					,ado_refresh	=> 0
+					,ado_rowset		=> $rs
 			});
 
-			my $ado_fields = [ Win32::OLE::in($rs->Fields) ];
-			$sth->STORE(ado_fields => $ado_fields);
-			my $NUM_OF_FIELDS = @$ado_fields;
+			$sth->{ado_comm}		= $conn;
+			$sth->{ado_conn}		= $conn;
+			$sth->{ado_current_row_count} = 0;
+			$sth->{ado_dbh}			= $dbh;
+			$sth->{ado_fields}	= $ado_fields;
+			$sth->{ado_params}	= [];
+			$sth->{ado_refresh}	= 0;
+			$sth->{ado_rowset}	= $rs;
+			$sth->{ado_attribs}	= $attribs;
 
-			$sth->STORE(Active => 1);
-			$sth->STORE(NUM_OF_FIELDS => $NUM_OF_FIELDS);
-			$sth->STORE( 'ado_params' => [] );
-			$sth->STORE(NAME => [ map { $_->Name } @$ado_fields ]);
-			$sth->STORE(ado_dbh => $dbh);
-			$sth->STORE(ado_conn => $conn);
-			$sth->STORE(ado_comm => $conn);
 
+			# print "Map of Fields that May Be NULL",
+			# 	join ( ",", map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1:0 } @$ado_fields ), 
+			# 	"\n";
+
+			$sth->STORE( NUM_OF_FIELDS	=> scalar @$ado_fields );
+
+
+			$sth->STORE( Active					=> 1);
+
+			$dbh->trace_msg( "<- _rs_sth_prepare: Create statement handle from RecordSet\n" );
 		return $outer;
-    }
+    } # _rs_sth_prepare
 
 
 # Determine the number of parameters, if Refresh fails.
@@ -533,7 +613,8 @@ sub _params
 	$sql =~ s/\n/ /;
 		my $rtn = join( " ", grep { m/\?/ } 
 			grep { ! m/^['"].*\?/ } &quotewords('\s+', 1, $sql));
-	return ($rtn =~ tr /?//);
+	my $cnt = ($rtn =~ tr /?//) || 0;
+	return $cnt;
 }
 
 	# Get information from the current provider.
@@ -554,7 +635,6 @@ sub _params
 	$sth;
     }
 
-use Win32::OLE::Variant;
 
 	sub table_info {
 		my($dbh, $attribs) = @_;
@@ -575,14 +655,16 @@ use Win32::OLE::Variant;
 		if (exists $attribs->{Filter}) {
 			$oRec->{Filter} = $attribs->{Filter};
 		}
-		
+
+		require Win32::OLE::Variant;
+
 		while(! $oRec->{EOF}) {
 			my @out = map { $oRec->Fields($_)->{Value} } 
 				map { $sch_dbi_to_ado->{$_} } @$field_names;
 			# Jan Dubois jand@activestate.com addition to handle changes
 			# in Win32::OLE return of Variant types of data.
 			foreach ( @out ) {
-				$_ = $_->As(VT_BSTR) 
+				$_ = $_->As(Win32::OLE::Variant::VT_BSTR()) 
 					if (defined $_) && (UNIVERSAL::isa($_, 'Win32::OLE::Variant'));
 			}
 			if ($attribs->{Trim_Catalog}) {
@@ -600,6 +682,41 @@ use Win32::OLE::Variant;
 		my $sth = $sponge->prepare($statement,
 			{ rows=> \@tp, NAME=> $field_names });
 		$sth;
+	}
+
+	sub primary_key_info {
+		my( $dbh, @Criteria ) = @_;
+		my $QueryType = 'adSchemaPrimaryKeys';
+		my @Rows;
+		my $conn = $dbh->{ado_conn};
+		my $tmpCursorLocation = $conn->{CursorLocation};
+		$conn->{CursorLocation} = $ado_consts->{adUseClient};
+
+		my $RecSet = $conn->OpenSchema( $ado_consts->{$QueryType}, \@Criteria );
+		my $lastError = DBD::ADO::errors($conn);
+		return DBI::set_err($dbh, $DBD::ADO::err,
+			"Error occurred with call to OpenSchema ($QueryType): $lastError")
+	   if $lastError;
+
+		$RecSet->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL';
+		$lastError = DBD::ADO::errors($conn);
+		return DBI::set_err($dbh, $DBD::ADO::err,
+			"Error occurred defining sort order : $lastError")
+	   if $lastError;
+
+		while ( ! $RecSet->{EOF} ) {
+			my $ado_fields = [ Win32::OLE::in($RecSet->Fields) ];
+			my @Fields = (map { $_->{Value} } Win32::OLE::in($RecSet->Fields) ) [ 0,1,2,3,6,7 ];
+			push( @Rows, \@Fields );
+			$RecSet->MoveNext;
+		}
+
+			$RecSet->Close; undef $RecSet;
+			$conn->{CursorLocation} = $tmpCursorLocation;
+
+			DBI->connect('dbi:Sponge:','','', { RaiseError => 1 })->prepare(
+				$QueryType, { rows => \@Rows, NAME =>
+			[ qw( TABLE_CAT TABLE_SCHEM TABLE_NAME COLUMN_NAME KEY_SEQ PK_NAME ) ]});
 	}
 
   	sub type_info_all {
@@ -658,7 +775,14 @@ use Win32::OLE::Variant;
 		DBI::SQL_FLOAT()    => [$ado_consts->{adSingle}],
 		DBI::SQL_INTEGER()  => [$ado_consts->{adInteger}],
 		DBI::SQL_LONGVARBINARY() => [$ado_consts->{adLongVarBinary}, $ado_consts->{adVarBinary}, $ado_consts->{adBinary}],
-		DBI::SQL_LONGVARCHAR() => [$ado_consts->{adLongVarChar}, $ado_consts->{adVarChar}, $ado_consts->{adChar}, $ado_consts->{adLongVarWChar}, $ado_consts->{adVarWChar}, $ado_consts->{adWChar}],
+		DBI::SQL_LONGVARCHAR() => [
+					  $ado_consts->{adLongVarChar}
+					, $ado_consts->{adVarChar}
+					, $ado_consts->{adChar}
+					, $ado_consts->{adLongVarWChar}
+					, $ado_consts->{adVarWChar}
+					, $ado_consts->{adWChar}
+					],
 		DBI::SQL_NUMERIC()  => [$ado_consts->{adNumeric}],
 		DBI::SQL_REAL()     => [$ado_consts->{adSingle}],
 		DBI::SQL_SMALLINT() => [$ado_consts->{adSmallInt}],
@@ -667,8 +791,19 @@ use Win32::OLE::Variant;
 		DBI::SQL_VARBINARY() => [$ado_consts->{adVarBinary}, $ado_consts->{adLongVarBinary}, $ado_consts->{adBinary}],
 		DBI::SQL_VARCHAR()  => [$ado_consts->{adVarChar}, $ado_consts->{adChar}, $ado_consts->{adVarWChar}, $ado_consts->{adWChar}],
 		DBI::SQL_WCHAR()  => [$ado_consts->{adWChar}, $ado_consts->{adVarWChar}, $ado_consts->{adLongVarWChar}],
-		DBI::SQL_WVARCHAR()  => [$ado_consts->{adVarWChar}, $ado_consts->{adLongVarWChar}, $ado_consts->{adWChar}],
-		DBI::SQL_WLONGVARCHAR()  => [$ado_consts->{adLongVarWChar}, $ado_consts->{adVarWChar}, $ado_consts->{adWChar}],
+		DBI::SQL_WVARCHAR()  => [
+					  $ado_consts->{adVarWChar}
+					, $ado_consts->{adLongVarWChar}
+					, $ado_consts->{adWChar}
+					],
+		DBI::SQL_WLONGVARCHAR()  => [
+				  $ado_consts->{adLongVarWChar}
+				, $ado_consts->{adVarWChar}
+				, $ado_consts->{adWChar}
+				, $ado_consts->{adLongVarChar}
+				, $ado_consts->{adVarChar}
+				, $ado_consts->{adChar}
+				],
 	    );
 
 	    my @sql_type = (
@@ -700,7 +835,7 @@ use Win32::OLE::Variant;
 			my $oLRec = 
 				$conn->OpenSchema($ado_consts->{adSchemaProviderTypes});
 				my $lastError = DBD::ADO::errors($conn);
-				die $lastError if $lastError;
+				return DBI::set_err($dbh, $DBD::ADO::err, "OpenSchema error: $lastError") if $lastError;
 				while(! $oLRec->{EOF}) {
 					# Sort by row
 					my $type_name = $oLRec->{TYPE_NAME}->{Value};
@@ -766,6 +901,7 @@ use Win32::OLE::Variant;
 					}
 				}
 
+			$dbh->trace_msg( "<- _determine_type_support\n" );
 			return \@prov_type_return;
 		}
 
@@ -775,19 +911,31 @@ use Win32::OLE::Variant;
 	}
 
 	sub _open_schema {
-		my ($dbh, $var) = @_;
+		my ($dbh, $var, @crit) = @_;
+		# my ($dbh, $var) = @_;
 
-		croak qq{_open_schema called with dbh defined} unless $dbh;
-		return undef unless $ado_consts->{$var};
+		$dbh->trace_msg( "-> _open_schema\n" );
+		Carp::croak qq{_open_schema called with dbh defined} unless $dbh;
 
+		unless (exists $ado_consts->{$var}) {
+			return DBI::set_err($dbh, $DBD::ADO::err, 
+				"OpenSchema called with unknown parameter: $var");
+		}
+		my $crit = \@crit if @crit;
 		my $conn = $dbh->{ado_conn};
 		my $oLRec = 
-			$conn->OpenSchema($ado_consts->{$var});
+# 		$conn->OpenSchema($ado_consts->{$var});
+ 			$conn->OpenSchema($ado_consts->{$var}, $crit);
 		my $lastError = DBD::ADO::errors($conn);
-		die $lastError if $lastError;
-		return _rs_sth_prepare( $dbh, $oLRec );
-	}
+		return $dbh->DBI::set_err($DBD::ADO::err, "OpenSchema error: : $lastError")
+			if $lastError;
 
+		my $sth = _rs_sth_prepare( $dbh, $oLRec );
+
+		$dbh->trace_msg( "<- _open_schema\n" );
+
+		return $sth;
+	} # _open_schema
 
 
     sub FETCH {
@@ -809,7 +957,8 @@ use Win32::OLE::Variant;
 				}
 				return $value unless $@;
         # else pass up to DBI to handle
-        return $dbh->DBD::_::db::FETCH($attrib);
+        return $dbh->SUPER::FETCH($attrib);
+        # return $dbh->DBD::_::db::FETCH($attrib);
     }
 
     sub STORE {
@@ -855,7 +1004,8 @@ use Win32::OLE::Variant;
 					return $value unless $@;
 					}
 				}
-        return $dbh->DBD::_::db::STORE($attrib, $value);
+        return $dbh->SUPER::STORE($attrib, $value);
+        # return $dbh->DBD::_::db::STORE($attrib, $value);
     }
 
 		# Rules for auto commit, if here, the provider supports.
@@ -889,6 +1039,8 @@ use Win32::OLE::Variant;
     use strict;
 		use vars qw($VT_VAR $VT_DAT $VT_STR $VT_BIN);
 
+		use Data::Dumper;
+
 		$VT_VAR = VT_VARIANT() | VT_BYREF();
 		$VT_DAT = VT_DATE();
 		$VT_STR = VT_BSTR() | VT_BYREF();
@@ -912,15 +1064,15 @@ use Win32::OLE::Variant;
 
 		sub bind_param {
 			my ($sth, $pNum, $val, $attr) = @_;
-			my $conn = $sth->FETCH("ado_conn");
-			my $comm = $sth->FETCH("ado_comm");
+			my $conn = $sth->{ado_conn};
+			my $comm = $sth->{ado_comm};
 
 	    my $param_cnt = $sth->FETCH( 'NUM_OF_PARAMS' );
-			return DBI::set_err($sth, 1,
+			return DBI::set_err($sth, $DBD::ADO::err,
 				"Bind Parameters called with no parameters defined!")
 	    unless $param_cnt;
 
-			return DBI::set_err($sth, 1,
+			return DBI::set_err($sth, $DBD::ADO::err,
 				"Bind Parameter $pNum outside current range of $param_cnt.")
 	    if ($pNum > $param_cnt or $pNum < 1);
 
@@ -965,13 +1117,14 @@ use Win32::OLE::Variant;
 
 		sub execute {
 			my ($sth, @bind_values) = @_;
-			my $comm = $sth->FETCH("ado_comm");
-			my $conn = $sth->FETCH("ado_conn");
+			my $comm = $sth->{ado_comm};
+			my $conn = $sth->{ado_conn};
 			my $sql  = $sth->FETCH("Statement");
 
+			$sth->trace_msg("-> execute state handler\n");
 			# If a record set is currently defined,
 			# release the set.
-			my $ors = $sth->FETCH("ado_rowset");
+			my $ors = $sth->{ado_rowset};
 			if (defined $ors) {
 				$ors->Close () if $ors and
 					$ors->State & $ado_consts->{adStateOpen};
@@ -990,15 +1143,16 @@ use Win32::OLE::Variant;
 			my $rs;
 			my $p = $comm->Parameters;
 			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($sth, 1,
+			return DBI::set_err($sth, $DBD::ADO::err,
 				"Execute Parameters failed 'ADODB.Command': $lastError")
-	    if $lastError;
+	    if $lastError and $DBD::ADO::err ne '-2147217839';
 
-			return DBI::set_err( $sth, 1, 
+			return DBI::set_err( $sth, $DBD::ADO::err, 
 		  		"Bind params passed without place holders")
 	    if (@bind_values and $p->{Count} == 0);
 
 			my $x = 0;
+			# Convert the parameters as needed.
 			for (@bind_values) {
 				my $i = $p->Item($x);
 				if ($i->{Type} == $ado_consts->{adVarBinary} and
@@ -1026,59 +1180,127 @@ use Win32::OLE::Variant;
 				$sth->trace_msg( "->> Parameter $x: " . ($params->[$x]||'undef') . "\n");
 				$x++;
 			}
-			$rs = $comm->Execute($rows);
 
-			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err( $sth, 1, 
-		  		"Can't execute statement '$sql': $lastError")
+			# At this point a command is ready to execute.  To allow for different
+			# type of cursors, I need to create a recordset object.
+
+			$rs = Win32::OLE->new('ADODB.RecordSet');
+			$lastError = Win32::OLE->LastError;
+			return $sth->DBI::set_err(1,
+				"Can't create 'object ADODB.RecordSet': $lastError")
 	    if $lastError;
-			
+
+			# Determine the the CursorType to use.  The default is adOpenForwardOnly.
+			my $cursortype = $ado_consts->{adOpenForwardOnly};
+			if ( exists $sth->{ado_attribs}->{CursorType} ) {
+				my $type = $sth->{ado_attribs}->{CursorType};
+				if (exists $ado_consts->{$type}) {
+					$sth->trace_msg( "Changing the cursor type to $type\n" );
+					$cursortype = $ado_consts->{$type};
+				} else {
+					warn "Attempting to use an invalid CursorType: $type : using default adOpenForwardOnly";
+				}
+			}
+
+			# Call to clear any previous error messages.
+			$lastError = DBD::ADO::errors($conn);
+
+			$sth->trace_msg( "Open record set using cursor type: $cursortype\n" );
+			$rs->Open( $comm, undef, $cursortype );
+
+			# Execute the statement, get a recordset in return.
+			# $rs = $comm->Execute($rows);
+			$lastError = DBD::ADO::errors($conn);
+			return $sth->DBI::set_err( $DBD::ADO::err, 
+		  		"Can't execute statement '$sql': $lastError")
+	    if $DBD::ADO::err;
+
+
+			# print "Current Cursortype: ", $rs->CursorType, "\n";
+			# $rs->CursorType = $ado_consts->{adOpenStatic} ;
+			# $lastError = DBD::ADO::errors($conn);
+			# return $sth->DBI::set_err( $DBD::ADO::err, 
+		  # 		"Can't execute statement '$sql': $lastError")
+	    # if $lastError;
+
 			$sth->{ado_rowset} = $rs;
 			$sth->{ado_fields} = my $ado_fields = [ Win32::OLE::in($rs->Fields) ];
 			my $num_of_fields = @$ado_fields;
 
-	if ($num_of_fields == 0) {	# assume non-select statement
-			# If the AutoCommit is on, Commit current transaction.
-			$conn->CommitTrans 
-				if $sth->{ado_dbh}->{AutoCommit} 
-					and $sth->{ado_dbh}->{ado_provider_support_auto_commit};
-			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err( $sth, 1, 
-		  		"Execute: Commit failed: $lastError")
-	    if $lastError;
-			my $c = ($rows->Value == 0 ? qq{0E0} : $rows->Value);
-			$sth->STORE('rows', $c);
-	    return ( $c );
-	}
+			if ($num_of_fields == 0) {	# assume non-select statement
+					# If the AutoCommit is on, Commit current transaction.
+					$conn->CommitTrans 
+						if $sth->{ado_dbh}->{AutoCommit} 
+							and $sth->{ado_dbh}->{ado_provider_support_auto_commit};
+					$lastError = DBD::ADO::errors($conn);
+					return DBI::set_err( $sth, $DBD::ADO::err, 
+							"Execute: Commit failed: $lastError")
+					if $lastError;
+					my $c = ($rows->Value == 0 ? qq{0E0} : $rows->Value);
+					$sth->STORE('rows', $c);
+					$sth->trace_msg("<- executed state handler (no recordset)\n");
+					return ( $c );
+			}
+
+			# Current setting of RowsInCache?
+			if ( my $rowcache = $sth->FETCH( 'RowsInCache' ) > 0 ) {
+					my $currowcache = $rs->CacheSize( );
+					$sth->trace_msg( "  changing the CacheSize using RowsInCache: $rowcache" );
+					$rs->CacheSize( $rowcache ) unless $rowcache == $currowcache;
+					$lastError = DBD::ADO::errors($conn);
+					return $sth->DBI::set_err( $DBD::ADO::err, 
+							"  Unable to change CacheSize to RowsInCache : $rowcache : $lastError")
+					if $DBD::ADO::err;
+			}
 
 		my $nof = $sth->FETCH('NUM_OF_FIELDS');
   	$sth->STORE(Active => 1);
 		$sth->STORE('NUM_OF_FIELDS' => $num_of_fields)
 			unless ($nof == $num_of_fields);
-		$sth->{NAME} = [ map { $_->Name } @$ado_fields ];
-		$sth->{TYPE} = [ map { $_->Type } @$ado_fields ];
-		$sth->{PRECISION} = [ map { $_->Precision } @$ado_fields ];
-		$sth->{SCALE} = [ map { $_->NumericScale } @$ado_fields ];
-		$sth->{NULLABLE} = [ map { 1 } @$ado_fields ];
-		$sth->{CursorName} = undef;
-		#$sth->{Statement} = $sql;
-		$sth->{Statement} = $rs->Source;
-		$sth->{RowsInCache} = undef;
-		$sth->STORE( 'rows', $rows->Value );
+		$sth->STORE( NAME				=> [ map { $_->Name } @$ado_fields ] );
+		$sth->STORE( TYPE				=> [ map { $_->Type } @$ado_fields ] );
+		$sth->STORE( PRECISION	=> [ map { $_->Precision } @$ado_fields ] );
+		$sth->STORE( SCALE			=> [ 
+			map { $_->NumericScale } @$ado_fields ] );
+		$sth->STORE( NULLABLE		=> 
+			[ 
+				map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1 : 0 } 
+						@$ado_fields 
+			]
+		);
+		# print "May Defer"
+		# 	, join( ", "
+		# 		, map { $_->Attributes & $ado_consts->{adFldMayDefer}? 1 : 0 } 
+		# 				@$ado_fields ), "\n";
+		# print "Is Long"
+		# 	, join( ", "
+		# 		, map { $_->Attributes & $ado_consts->{adFldLong}? 1 : 0 } 
+		# 				@$ado_fields ), "\n";
+
+		$sth->STORE( CursorName		=> undef);
+		$sth->STORE( Statement		=> $rs->Source);
+		$sth->STORE( RowsInCache	=> $rs->CacheSize);
+		$sth->STORE( rows					=> $rs->RecordCount );
 
 		# We need to return a true value for a successful select
 		# -1 means total row count unavailable
-		return $rows->Value;
+		$sth->trace_msg("<- executed state handler\n");
+		return $rs->RecordCount;
     }
 
 
 
     sub fetchrow_arrayref {
 			my ($sth) = @_;
-			my $rs = $sth->FETCH('ado_rowset');
+			my $rs = $sth->{ado_rowset};
 
-			return undef unless $sth->FETCH('Active');
-			return undef unless $rs;
+			# return undef unless $sth->FETCH('Active');
+			return $sth->DBI::set_err( -900, 
+		  	"statement handle not marked as Active.") unless $sth->FETCH('Active');
+
+			return $sth->DBI::set_err( -905, 
+		  	"Recordset Undefined, execute statement not called?") unless $rs;
+
 			return undef if $rs->EOF;
 
 			# required to not move from the current row
@@ -1090,7 +1312,7 @@ use Win32::OLE::Variant;
 			return undef if $rs->{EOF};
 
 			my $lastError = DBD::ADO::errors($sth->{ado_conn});
-			return DBI::set_err( $sth, 1, 
+			return DBI::set_err( $sth, $DBD::ADO::err, 
 		  	"Fetch failed: $lastError")
 	    if $lastError;
 
@@ -1107,6 +1329,28 @@ use Win32::OLE::Variant;
   		}
 			if ($sth->FETCH('ChopBlanks')) {
 				map { $_ =~ s/\s+$//; } @$row;
+			}
+
+			# Display the attributes for each row selected:
+			if(0) {
+				foreach my $field (map { $rs->Fields($_->{Name}) } @$ado_fields) {
+					print "Name        : ", $field->Name, "\n";
+					print "--------------", "\n";
+					print "ActualSize  : ", $field->ActualSize, "\n";
+					print "Attributes  : ", $field->Attributes, "\n";
+					print "        Long: ", $field->Attributes & $ado_consts->{adFldLong}? 1 : 0 , "\n";
+					print "        Null: ", $field->Attributes & $ado_consts->{adFldMayBeNull}? 1 : 0 , "\n";
+					print "       Defer: ", $field->Attributes & $ado_consts->{adFldMayDefer}? 1 : 0 , "\n";
+					print "       Fixed: ", $field->Attributes & $ado_consts->{adFldFixed}? 1 : 0 , "\n";
+					print "         Key: ", $field->Attributes & $ado_consts->{adFldKeyColumn}? 1 : 0 , "\n";
+					# print "DataFormat  : ", $field->DataFormat, "\n";
+					print "DefinedSize : ", $field->DefinedSize, "\n";
+					print "NumericScale: ", $field->NumericScale, "\n";
+					print "Precision   : ", $field->Precision, "\n";
+					print "Status      : ", $field->Status, "\n";
+					print "Type        : ", $field->Type, "\n";
+					print "\n";
+				}
 			}
 
 
@@ -1132,7 +1376,8 @@ use Win32::OLE::Variant;
 				if ( exists $sth->{$attrib} ) {
 					return $sth->{$attrib};
 				}
-        return $sth->DBD::_::dr::FETCH($attrib);
+        return $sth->SUPER::FETCH($attrib);
+        # return $sth->DBD::_::dr::FETCH($attrib);
     }
 
     sub STORE {
@@ -1142,7 +1387,8 @@ use Win32::OLE::Variant;
 					return $sth->{$attrib} = $value;
 				}
         # else pass up to DBI to handle
-        return $sth->DBD::_::dr::STORE($attrib, $value);
+        return $sth->SUPER::STORE($attrib, $value);
+        # return $sth->DBD::_::dr::STORE($attrib, $value);
     }
 
     sub ColAttributes {         # maps to SQLColAttributes
@@ -1226,7 +1472,7 @@ data sources.
 	Using the standard DBI function call
 		$dbh->func( arguments, 'function name')
 	
-	You may access the following functions: (case sensitave)
+	You may access the following functions: (case sensitive)
 		OpenSchema
 
 	All functions return a valid statement handle upon success.
@@ -1241,6 +1487,44 @@ data sources.
 			my $sth = $dbh->func( 'adSchemaProviderTypes', 'OpenSchema' );
 
 =head1 Enhanced DBI Methods
+
+=head2 prepare
+
+The B<prepare> methods allows attributes: (from DBI)
+
+    "prepare"
+          $sth = $dbh->prepare($statement)          or die $dbh->errstr;
+          $sth = $dbh->prepare($statement, \%attr)  or die $dbh->errstr;
+
+		prepare supports setting the CursorType.
+			$sth = $dbh->prepare( $statement, { CursorType => 'adOpenForwardOnly' } ) ...
+				Cursortypes adOpenForwardOnly(default), adOpenKeyset, adOpenDynamic, adOpenStatic
+
+		When using a statement handle within a statement handle:
+			while( my $table = $sth1->fetchrow_hashref ) {
+				...
+				my $col = $sth2->fetchrow_hashref;
+				...
+			}
+		It may be necessary to prepare the statement using CursorType => adOpenStatic. 
+
+		Changing the CursorType is a solution to the following problem.
+			Can't execute statement 'select * from authors':
+			Lasterror:       -2147467259: OLE exception from "Microsoft OLE DB Provider for SQL Server":
+
+			Cannot create new connection because in manual or distributed transaction
+			mode.
+
+			Win32::OLE(0.1403) error 0x80004005: "Unspecified error"
+					in METHOD/PROPERTYGET "Open"
+							Description:    Cannot create new connection because in manual or distributed transactio
+							HelpContext:    0
+							HelpFile:
+							NativeError:    0
+							Number:         -2147467259
+							Source:         Microsoft OLE DB Provider for SQL Server
+							SQLState:
+
 
 
 =head2 table_info

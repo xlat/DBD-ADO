@@ -4,6 +4,8 @@ use DBI qw(:sql_types);
 use ADOTEST;
 use strict;
 
+use Test::More tests => 70;
+
 #
 
 $| = 1;
@@ -19,14 +21,21 @@ unless($dbh) {
     exit 0;
 }
 
+print "Test Verbose: ", $ENV{TEST_VERBOSE}, "\n";
+
 my $tn = ($dbh->type_info(SQL_NUMERIC()))[0]->{TYPE_NAME};
 my $tiv = SQL_NUMERIC();
 
 my @test_sets;
-foreach my $t (SQL_WLONGVARCHAR(), SQL_LONGVARBINARY()) {
+foreach my $t (SQL_LONGVARCHAR, SQL_WLONGVARCHAR(), SQL_LONGVARBINARY()) {
 	my @r = $dbh->type_info( $t );
-	print "For $t Using: ", my $tbd = ($r[0])->{TYPE_NAME}, "\n";
-	push( @test_sets, [ "$tbd", $t ] );
+	foreach my $rt ( @r ) {
+		next if ( $rt->{TYPE_NAME} =~ m/nclob/i );
+		next if ( $rt->{TYPE_NAME} =~ m/raw/i );
+		print "For $t Using: ", my $tbd = $rt->{TYPE_NAME}, "\n";
+		push( @test_sets, [ "$tbd", $t ] );
+		last;
+	}
 }
 
 # Set size of test data (in 10KB units)
@@ -75,23 +84,41 @@ warn "long_data2 is not smaller than $long_data1 ($len_data2 > $len_data1)\n"
 
 if (!ADOTEST::tab_long_create($dbh, "midx", $tn, SQL_NUMERIC(), "lng", $type_name, $type_num)) {
     warn "Unable to create test table for '$type_name' data ($DBI::err). Tests skipped.\n";
-    foreach (1..$tests_per_set) { ok(0, 1) }
+    foreach (1..$tests_per_set) { ok(0) }
     return;
 }
+# Determine if an escape sequence is usable.
+my @row;
+foreach (DBI::SQL_DATE(), SQL_TIMESTAMP()) {
+	@row = $dbh->type_info($_);
+	last if @row;
+}
+my $r = shift @row;
+my $pf = $r->{LITERAL_PREFIX};
+my $sf = $r->{LITERAL_SUFFIX};
+$pf = qq/{d \'/ unless $pf; #'
+$sf = qq/\' }/  unless $sf; #'
+
+# qeDBF needs a space after the table name!
+
+print "Building dates using: $pf $sf\n";
+
+my $dt = qq{${pf}2001-10-11${sf}};
 
 print " --- insert some $type_name data\n";
-ok(0, $sth = $dbh->prepare("insert into $table(midx,lng,dt) values (?, ?, 1999-01-27)"), 1);
+
+ok( $sth = $dbh->prepare("insert into $table(midx,lng,dt) values (?, ?, $dt)"), " --- insert some $type_name data" );
 $sth->bind_param(1, 40, { TYPE => SQL_NUMERIC() } ) or die $DBI::errstr;
 $sth->bind_param(2, $long_data0, { TYPE => $type_num } ) or die $DBI::errstr;
-ok(0, $sth->execute(), 1);
+ok( $sth->execute(), "Inserted data" );
 
 $sth->bind_param(1, 41, { TYPE => SQL_NUMERIC() } ) or die $DBI::errstr;
 $sth->bind_param(2, $long_data1, { TYPE => $type_num } ) or die $DBI::errstr;
-ok(0, $sth->execute(), 1);
+ok( $sth->execute(), "Inserted data" );
 
 $sth->bind_param(1, 42, { TYPE => SQL_NUMERIC() } ) or die $DBI::errstr;
 $sth->bind_param(2, $long_data2, { TYPE => $type_num } ) or die $DBI::errstr;
-ok(0, $sth->execute(42, $long_data2), 1);
+ok( $sth->execute(42, $long_data2), "Inserted data" );
 
 
 print " --- fetch $type_name data back again -- truncated - LongTruncOk == 1\n";#  
@@ -103,14 +130,14 @@ print "LongReadLen $dbh->{LongReadLen}, LongTruncOk $dbh->{LongTruncOk}\n";
 my $out_len = $dbh->{LongReadLen};
 $out_len *= 2 if ($type_name =~ /RAW/i);
 
-ok(0, $sth = $dbh->prepare("select midx, lng, dt from $table order by midx"), 1);
-ok(0, $sth->execute, 1);
-ok(0, $tmp = $sth->fetchall_arrayref, 1);
-ok(0, $tmp->[0][1] eq substr($long_data0,0,$out_len),
+ok( $sth = $dbh->prepare("select midx, lng, dt from $table order by midx"), "select from table");
+ok( $sth->execute, "execute select:" );
+ok( $tmp = $sth->fetchall_arrayref );
+ok( $tmp->[0][1] eq substr($long_data0,0,$out_len),
 	cdif($tmp->[0][1], substr($long_data0,0,$out_len), "Len ".length($tmp->[0][1])) );
-ok(0, $tmp->[1][1] eq substr($long_data1,0,$out_len),
+ok( $tmp->[1][1] eq substr($long_data1,0,$out_len),
 	cdif($tmp->[1][1], substr($long_data1,0,$out_len), "Len ".length($tmp->[1][1])) );
-ok(0, $tmp->[2][1] eq substr($long_data2,0,$out_len),
+ok( $tmp->[2][1] eq substr($long_data2,0,$out_len),
 	cdif($tmp->[2][1], substr($long_data2,0,$out_len), "Len ".length($tmp->[2][1])) );
 
 
@@ -121,17 +148,17 @@ $dbh->{LongReadLen} = $dbh->{LongReadLen} / 2 if $type_name =~ /RAW/i;
 $dbh->{LongTruncOk} = 0;
 print "LongReadLen $dbh->{LongReadLen}, LongTruncOk $dbh->{LongTruncOk}\n";
 
-ok(0, $sth = $dbh->prepare("select midx, lng, dt from $table order by midx"), 1);
-ok(0, $sth->execute, 1);
+ok($sth = $dbh->prepare("select midx, lng, dt from $table order by midx") );
+ok($sth->execute );
 
-ok(0, $tmp = $sth->fetchrow_arrayref, 1);
-ok(0, $tmp->[1] eq $long_data0, length($tmp->[1]));
+ok($tmp = $sth->fetchrow_arrayref );
+ok($tmp->[1] eq $long_data0, " compare length : " . length($tmp->[1]));
 
-ok(0, !defined $sth->fetchrow_arrayref,
+ok( !defined $sth->fetchrow_arrayref,
 	"truncation error not triggered "
 	."(LongReadLen $dbh->{LongReadLen}, data ".length($tmp->[1]||0).")");
 $tmp = $sth->err || 0;
-ok(0, $tmp == 1406 || $tmp == 24345, 1);
+ok( $tmp == 1406 || $tmp == 24345 );
 
 
 print " --- fetch $type_name data back again -- complete - LongTruncOk == 0\n";
@@ -139,62 +166,62 @@ $dbh->{LongReadLen} = $len_data1 +1000;
 $dbh->{LongTruncOk} = 0;
 print "LongReadLen $dbh->{LongReadLen}, LongTruncOk $dbh->{LongTruncOk}\n";
 
-ok(0, $sth = $dbh->prepare("select midx, lng, dt from $table order by midx"), 1);
-ok(0, $sth->execute, 1);
+ok( $sth = $dbh->prepare("select midx, lng, dt from $table order by midx") );
+ok( $sth->execute );
 
-ok(0, $tmp = $sth->fetchrow_arrayref, 1);
-ok(0, $tmp->[1] eq $long_data0, length($tmp->[1]));
+ok( $tmp = $sth->fetchrow_arrayref );
+ok( $tmp->[1] eq $long_data0, " compare length: " . length($tmp->[1]));
 
-ok(0, $tmp = $sth->fetchrow_arrayref, 1);
-ok(0, $tmp->[1] eq $long_data1, length($tmp->[1]));
+ok( $tmp = $sth->fetchrow_arrayref );
+ok( $tmp->[1] eq $long_data1, " compare length: " . length($tmp->[1]));
 
-ok(0, $tmp = $sth->fetchrow_arrayref, 1);
+ok(0, $tmp = $sth->fetchrow_arrayref );
 if ($tmp->[1] eq $long_data2) {
-  ok(0, 1);
+  ok(1);
 }
 elsif (length($tmp->[1]) == length($long_data1)
    && substr($tmp->[1], 0, length($long_data2)) eq $long_data2
 ) {
-  ok(0, 1);
+  ok(1);
 }
 else {
-  ok(0, $tmp->[1] eq $long_data2,
+  ok( $tmp->[1] eq $long_data2, " compare lengths: " .
 	cdif($tmp->[1],$long_data2, "Len ".length($tmp->[1])) );
 }
 print " --- fetch $type_name data back again -- via blob_read\n";
 $dbh->{LongReadLen} = 1024 * 90;
 $dbh->{LongTruncOk} =  1;
-ok(0, $sth = $dbh->prepare("select midx, lng, dt from $table order by midx"), 1);
-ok(0, $sth->execute, 1);
-ok(0, $tmp = $sth->fetchrow_arrayref, 1);
+ok( $sth = $dbh->prepare("select midx, lng, dt from $table order by midx"), "prepare select" );
+ok( $sth->execute, "execute select" );
+ok( $tmp = $sth->fetchrow_arrayref, "fetchrow_arrayref" );
 
 print "idx ", $tmp->[0], "\n";
-ok(0, blob_read_all($sth, 1, \$p1, 4096) == length($long_data0), 1);
-ok(0, $p1 eq $long_data0, cdif($p1, $long_data0));
+ok( blob_read_all($sth, 1, \$p1, 4096) == length($long_data0), "blob_read_all: " );
+ok( $p1 eq $long_data0, " compare differences: " . cdif($p1, $long_data0));
 
-ok(0, $tmp = $sth->fetchrow_arrayref, 1);
+ok( $tmp = $sth->fetchrow_arrayref, "fetchrow_arrayref: " );
 print "idx ", $tmp->[0], "\n";
-ok(0, blob_read_all($sth, 1, \$p1, 12345) == length($long_data1), 1);
-ok(0, $p1 eq $long_data1, cdif($p1, $long_data1));
+ok( blob_read_all($sth, 1, \$p1, 12345) == length($long_data1), "blob_read_all: ");
+ok( $p1 eq $long_data1, " compare differences: " . cdif($p1, $long_data1) );
 
-ok(0, $tmp = $sth->fetchrow_arrayref, 1);
+ok( $tmp = $sth->fetchrow_arrayref, 1);
 print "idx ", $tmp->[0], "\n";
 my $len = blob_read_all($sth, 1, \$p1, 34567);
 
 if ($len == length($long_data2)) {
-    ok(0, $len == length($long_data2), $len);
+    ok( $len == length($long_data2), " length compare: " . length($len));
 	# Oracle may return the right length but corrupt the string.
-    ok(0, $p1 eq $long_data2, cdif($p1, $long_data2) );
+    ok( $p1 eq $long_data2, cdif($p1, $long_data2) );
 }
 elsif ($len == length($long_data1)
    && substr($p1, 0, length($long_data2)) eq $long_data2
 ) {
-  ok(0, 1);
-  ok(0, 1, 0);
+  pass( "Length correct" );
+  # ok(1);
 }
 else {
-    ok(0, 0, "Fetched length $len, expected ".length($long_data2));
-    ok(0, 0, 0);
+    fail("Fetched length $len, expected ".length($long_data2));
+    # ok(0);
 }
 
 $sth->finish;
@@ -273,21 +300,21 @@ sub cdif {
 }
 
 
-sub ok ($$;$) {
-    my($n, $ok, $warn) = @_;
-    $warn ||= '';
-    ++$t;
-    die "sequence error, expected $n but actually $t"
-    if $n and $n != $t;
-    if ($ok) {
-	print "ok $t\n";
-    }
-    else {
-	$warn = $DBI::errstr || "(DBI::errstr undefined)" if $warn eq '1';
-	warn "# failed test $t at line ".(caller)[2].". $warn\n";
-	print "not ok $t\n";
-	++$failed;
-    }
-}
+# sub ok ($$;$) {
+#     my($n, $ok, $warn) = @_;
+#     $warn ||= '';
+#     ++$t;
+#     die "sequence error, expected $n but actually $t"
+#     if $n and $n != $t;
+#     if ($ok) {
+# 	print "ok $t\n";
+#     }
+#     else {
+# 	$warn = $DBI::errstr || "(DBI::errstr undefined)" if $warn eq '1';
+# 	warn "# failed test $t at line ".(caller)[2].". $warn\n";
+# 	print "not ok $t\n";
+# 	++$failed;
+#     }
+# }
 
 __END__

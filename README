@@ -1,4 +1,14 @@
 
+Changes Version 2.4: Tue Oct 23 23:25:42 EDT 2001
+	Patch for supporting primary_key_info from Steffen Goeldner <s.goeldner@eurodata.de>
+		Thanks Steffen!
+	Bug in function call to openschema from Steffen Goeldner <s.goeldner@eurodata.de>
+		Thanks Steffen!
+	Added support for CursorType.
+	Fixed error messages to return more meaningful numbers.
+	Fixed Nullable attribute.
+	Added more documentation.
+	Modified most of the tests to use Test::More.
 
 Changes Version 2.1: Sat May 26 07:51:19 EDT 2001
 	First CPAN release apart from DBI.
@@ -72,6 +82,43 @@ Functions support
                             my $sth = $dbh->func( 'adSchemaProviderTypes', 'OpenSchema' );
 
 Enhanced DBI Methods
+  prepare
+
+    The prepare methods allows attributes: (from DBI)
+
+        "prepare"
+              $sth = $dbh->prepare($statement)          or die $dbh->errstr;
+              $sth = $dbh->prepare($statement, \%attr)  or die $dbh->errstr;
+
+                    prepare supports setting the CursorType.
+                            $sth = $dbh->prepare( $statement, { CursorType => 'adOpenForwardOnly' } ) ...
+                                    Cursortypes adOpenForwardOnly(default), adOpenKeyset, adOpenDynamic, adOpenStatic
+
+                    When using a statement handle within a statement handle:
+                            while( my $table = $sth1->fetchrow_hashref ) {
+                                    ...
+                                    my $col = $sth2->fetchrow_hashref;
+                                    ...
+                            }
+                    It may be necessary to prepare the statement using CursorType => adOpenStatic. 
+
+                    Changing the CursorType is a solution to the following problem.
+                            Can't execute statement 'select * from authors':
+                            Lasterror:       -2147467259: OLE exception from "Microsoft OLE DB Provider for SQL Server":
+
+                            Cannot create new connection because in manual or distributed transaction
+                            mode.
+
+                            Win32::OLE(0.1403) error 0x80004005: "Unspecified error"
+                                            in METHOD/PROPERTYGET "Open"
+                                                            Description:    Cannot create new connection because in manual or distributed transactio
+                                                            HelpContext:    0
+                                                            HelpFile:
+                                                            NativeError:    0
+                                                            Number:         -2147467259
+                                                            Source:         Microsoft OLE DB Provider for SQL Server
+                                                            SQLState:
+
   table_info
 
     Warning: This method is experimental and may change or disappear.
