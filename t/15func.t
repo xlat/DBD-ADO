@@ -11,9 +11,12 @@ use warnings;
 
 my ($pf, $sf);
 
-use Test::More tests => 49;
-
-BEGIN { use_ok( 'DBD::ADO' ); }
+use Test::More;
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 49;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
 
 my $non_supported = '-2146825037';
 

@@ -10,7 +10,13 @@ use Data::Dumper;
 
 use vars qw($tests);
 
-use Test::More tests => 18;
+use Test::More;
+
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 18;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
 
 pass( "Begining test, modules loaded" );
 

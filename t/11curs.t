@@ -1,16 +1,20 @@
 #!/usr/bin/perl -I./t
+# vim:ts=2:sw=2:ai:aw:nu:
 $| = 1;
 
-# vim:ts=2:sw=2:ai:aw:nu:
 use DBI qw(:sql_types);
 use ADOTEST;
 use Data::Dumper;
 use strict;
 my ($pf, $sf);
 
-use Test::More tests => 74;
+use Test::More;
 
-BEGIN { use_ok( 'DBD::ADO' ); }
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 74;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
 
 my $non_supported = '-2146825037';
 
@@ -167,6 +171,8 @@ $sth1 = undef;
 # }
 
 ok( $dbh->do( qq{drop table $ADOTEST::table_name} ) , " Drop test table" );
+
+ok( !$dbh->disconnect, q{Disconnect} );
 
 exit(0);
 

@@ -1,14 +1,22 @@
 #!/usr/bin/perl -I./t
+# vim:ts=2:sw=2:ai:aw:nu:
+
 $| = 1;
 
-# vim:ts=2:sw=2:ai:aw:nu:
 use DBI qw(:sql_types);
 use ADOTEST;
 use strict;
 
 use vars qw($tests);
 
-use Test::More tests => 23;
+use Test::More;
+
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 24;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
+
 
 my $non_supported = '-2146825037';
 
@@ -37,7 +45,7 @@ ok( $rc = tab_select($dbh), " select test data" );
 
 $rc = undef;
 TODO: {
-	local $TODO = q{Some day I figure out how to support LongReadLen};
+	local $TODO = q{LongReadLen Not Supported Yet};
 	$dbh->{LongReadLen} = 50;
 	$dbh->{LongTruncOk} = 1;
 	ok( ($rc = select_long($dbh)) eq 1, " test LongTruncOk ON" );
@@ -130,10 +138,13 @@ ok( defined $sth1, "Prepared statement * and Parameter." );
 	eval { 
 		local ($sth1->{PrintError}, $sth1->{RaiseError});
 		$sth1->{PrintError} = 0; $sth1->{RaiseError} = 1;
+		$sth1->execute(99);
 		@row = $sth1->fetchrow;
 	};
-	ok( $@, "RaiseError caught error: $@" );
+	ok( defined $@, "RaiseError caught error:\n$@" );
 }
+
+ok (!$dbh->disconnect, "Disconnect" );
 
 exit(0);
 
@@ -265,7 +276,3 @@ sub select_long
 }
 
 __END__
-
-
-
-

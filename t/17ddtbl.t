@@ -6,9 +6,13 @@ $| = 1;
 use strict;
 use ADOTEST();
 
-use Test::More tests => 10;
+use Test::More;
 
-BEGIN { use_ok('DBD::ADO') }
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 10;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
 
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 ok ( defined $dbh, 'Connection');
@@ -77,7 +81,7 @@ ok ( defined $dbh, 'Connection');
 }
 =cut
 
-$dbh->disconnect;
+ok(!$dbh->disconnect, "Disconnect");
 
 exit;
 

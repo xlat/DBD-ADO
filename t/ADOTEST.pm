@@ -85,8 +85,10 @@ sub tab_create {
 
 	    $fields .= $r->{TYPE_NAME};
 
+			# Oracle is having problems with nvarchar2(4000), cut the column size in
+			# half, for now.
 			if (defined $r->{CREATE_PARAMS}) {
-				$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{)} 
+				$fields .= qq{(} . int($r->{COLUMN_SIZE}/2) . qq{)} 
 					if ($r->{CREATE_PARAMS} =~ /LENGTH/i);
 				$fields .= qq{(} . $r->{COLUMN_SIZE} . qq{, 0)} 
 					if ($r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i);
@@ -168,7 +170,7 @@ sub tab_long_create {
 	foreach my $rt ( @row ) {
 		next if ( $rt->{TYPE_NAME} =~ m/nclob/i );
 		next if ( $rt->{TYPE_NAME} =~ m/raw/i );
-		next if ($row[0])->{TYPE_NAME} =~ /identity$/;
+		next if ($row[0])->{TYPE_NAME} =~ /identity$/i;
 		$fields .= ", ";
 		$fields .= "$col_name ";
 		$fields .= $rt->{TYPE_NAME};

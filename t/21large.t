@@ -8,6 +8,7 @@ use strict;
 use warnings;
 use DBI qw(:sql_types);
 use Time::HiRes qw(gettimeofday tv_interval);
+use ADOTEST;
 
 use Data::Dumper;
 
@@ -20,9 +21,15 @@ my %TestFieldInfo = (
 	'D' => [SQL_DATE, SQL_TIMESTAMP],
 );
 
-$table_name = "dbd_ado_large";
+$ADOTEST::table_name = $table_name = "dbd_ado_large";
 
-use Test::More tests => 37;
+use Test::More;
+
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 37;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
 
 pass( "Begining test, modules loaded" );
 
@@ -48,7 +55,7 @@ foreach my $type (@$chck) {
 
 # ok(!$dbh->do( qq(drop table $table_name) ), "Drop table $table_name" );
 
-ok( tab_create($dbh), "Create table $table_name" );
+ok( ADOTEST::tab_create($dbh), "Create table $table_name" );
 
 my $sel = $dbh->prepare( qq{select * from $table_name},
 	{ ado_cursortype			=> 'adOpenStatic' }
@@ -154,7 +161,7 @@ exit;
 sub run_insert_test {
 	my $dbh = shift;
 	# ok(!$dbh->do( qq(drop table $table_name) ), "Drop table $table_name" );
-	ok( tab_create($dbh), "Create table $table_name" );
+	ok( ADOTEST::tab_create($dbh), "Create table $table_name" );
 	# Add test data.
 	my $ins = $dbh->prepare( qq{insert into $table_name (A,B) values (?,?)}, {ado_usecmd => 1 } );
 	ok( defined $ins, "Insert statement prepared" );
@@ -184,59 +191,4 @@ sub run_insert_test {
 	$ins->finish; $ins = undef;
 	return;
 }
-
-
-
-sub get_type_for_column {
-	my $dbh = shift;
-	my $column = shift;
-
-	my $type;
-	my @row;
-	my $sth;
-	foreach $type (@{ $TestFieldInfo{$column} }) {
-	    @row = $dbh->type_info($type);
-	    # may not correct behavior, but get the first compat type
-			#print "Type $type rows: ", scalar(@row), "\n";
-	    last if @row;
-	}
-	die "Unable to find a suitable test type for field $column"
-	    unless @row;
-	return @row;
-}
-	
-sub tab_create {
-	my $dbh = shift;
-			{
-				local ($dbh->{PrintError}, $dbh->{RaiseError}, $dbh->{Warn});
-				$dbh->{PrintError} = $dbh->{RaiseError} = $dbh->{Warn} = 0;
-	    	$dbh->do("DROP TABLE $table_name");
-			}
-
-	# $dbh->{PrintError} = 1;
-
-	# trying to use ADO to tell us what type of data to use,
-	# instead of the above.
-	my $fields = undef;
-	my ($f,$r);
-	foreach $f (sort keys %TestFieldInfo) {
-	    #print "$f: @{$TestFieldInfo{$f}}\n";
-	    $fields .= ", " unless !$fields;
-	    $fields .= "$f ";
-	    #print "-- $fields\n";
-
-	    my @row = get_type_for_column($dbh, $f);
-			shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/i;
-			shift @row if ($row[0])->{TYPE_NAME} =~ /nclob/i;
-
-			$r = shift @row;
-	    $fields .= $dbh->func( $r,  'create_parm');
-
-	}
-	print "Using fields: $fields\n";
-	return $dbh->do(qq{CREATE TABLE $table_name ($fields)});
-}
-
-
-
 __END__

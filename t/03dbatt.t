@@ -5,8 +5,15 @@ $|=1;
 
 use DBI qw(:sql_types);
 use ADOTEST;
-use Test::More tests => 29;
 use strict;
+
+use Test::More;
+
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 29;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
 
 my ($pf, $sf);
 

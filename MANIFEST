@@ -4,6 +4,7 @@ Makefile.PL
 README
 ToDo
 ex/OpenSchema.pl
+ex/Provider.pl
 lib/DBD/ADO.pm
 lib/DBD/ADO/GetInfo.pm
 t/01base.t
@@ -12,13 +13,15 @@ t/03dbatt.t
 t/05meth.t
 t/07long.t
 t/09bind.t
+t/09null.t
 t/11curs.t
 t/15func.t
 t/17conn.t
 t/17ddtbl.t
 t/19ddpk.t
 t/21large.t
+t/22rows.t
 t/23ddcol.t
 t/23warn.t
 t/ADOTEST.pm
-
+META.yml                                Module meta-data (added by MakeMaker)

@@ -1,3 +1,23 @@
+
+Changes Version 2.7: Thu Aug 21 23:10:50 EDT 2003
+
+	Bug fix from Yimin Zheng regarding undef/null values passed as
+	parameters to bind_param and/or execute
+	Thanks Yimin.
+	
+	Enhancement to Meta Data support from Steffen Goeldner.
+	Thanks Steffen.
+
+	Modified all tests to skip if DBI_DSN is not defined.  This should
+	allow the automatic CPAN build at ActiveState to create a PPM for
+	DBD::ADO
+
+	Did minor clean up in the test and warning messages for uninitialized
+	values.
+
+Changes Version 2.6:  So what happened to the notes for 2.6?
+
+
 Changes Version 2.5: Mon  Apr 8, 2002  23:00:39
 
 	Bug fix from Jacqui Caren <jacqui.caren@ig.co.uk>, apply to bind image.
@@ -34,7 +54,8 @@ Changes Version 2.1: Sat May 26 07:51:19 EDT 2001
 	Version number correction.
 	Patch from Simon Oliver:  Warning messages from undefined values.
 
-New maintainer: Thomas Lowery stlowery@yahoo.com
+New maintainer: Thomas Lowery tlowery@stlowery.com
+When emailing, make sure to include ADO in the subject line.
 
 NAME
     DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)

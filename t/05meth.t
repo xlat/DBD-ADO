@@ -1,10 +1,16 @@
 #!/usr/bin/perl -I./t
 
 $| = 1;
-print "1..$::tests\n";
 
 use DBI;
 use strict;
+
+unless (defined $ENV{DBI_DSN}) {
+	$::tests = 0;
+	exit;
+}
+
+print "1..$::tests\n";
 
 my @row;
 

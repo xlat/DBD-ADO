@@ -16,7 +16,13 @@ use constant MAX_ROWS => 200;
 
 $table_name = "products";
 
-use Test::More tests => 3;
+use Test::More;
+
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 3;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
 
 pass( "Begining test, modules loaded" );
 

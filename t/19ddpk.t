@@ -1,12 +1,17 @@
 #!/usr/bin/perl -I./t
+# vim:ts=2:sw=2:ai:aw:nu:
 $| = 1;
 
 use strict;
 use ADOTEST();
 
-use Test::More tests => 8;
+use Test::More;
 
-BEGIN { use_ok('DBD::ADO') }
+if (defined $ENV{DBI_DSN}) {
+	plan tests => 8;
+} else {
+	plan skip_all => 'Cannot test without DB info';
+}
 
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 ok ( defined $dbh, 'Connection');
@@ -60,7 +65,7 @@ ok( $dbh->do( $sql ), 'Create table');
   }
 }
 
-$dbh->disconnect;
+ok(!$dbh->disconnect, q{Disconnect});
 
 exit;
 

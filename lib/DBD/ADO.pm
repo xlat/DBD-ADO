@@ -10,10 +10,10 @@
 		use vars qw($err $errstr $state $drh $VERSION @EXPORT);
 
     @EXPORT = ();
-    $VERSION = (qw$Revision: 2.6 $)[1];
+    $VERSION = (qw$Revision: 2.7 $)[1];
 
 
-#   $Id: ADO.pm,v 2.6 2002/11/09 21:08:44 talowery Exp $
+#   $Id: ADO.pm,v 2.7 2003/08/22 03:41:10 talowery Exp $
 #
 #   Copyright (c) 1999, Phlip & Tim Bunce
 #   Copyright (c) 2000, Phlip   Tim Bunce, and Thomas Lowery
@@ -64,14 +64,14 @@
 				my $err;
 				foreach $err (Win32::OLE::in($Errors)) {
 	    		next if $err->{Number} == 0; # Skip warnings
-	    		push(@$err_ary, 
-						"\tDescription:\t$err->{Description}",
-	    			"\tHelpContext:\t$err->{HelpContext}",
-						"\tHelpFile:   \t$err->{HelpFile}",
-	    			"\tNativeError:\t$err->{NativeError}",
-						"\tNumber:     \t$err->{Number}", 
-						"\tSource:     \t$err->{Source}",
-						"\tSQLState:   \t$err->{SQLState}");
+	    		push(@$err_ary
+						, qq{\tDescription:\t} . ($err->{Description}||q{})
+	    			, qq{\tHelpContext:\t} . ($err->{HelpContext}||q{})
+						, qq{\tHelpFile:   \t} . ($err->{HelpFile}||q{})
+	    			, qq{\tNativeError:\t} . ($err->{NativeError}||q{})
+						, qq{\tNumber:     \t} . ($err->{Number}||q{})
+						, qq{\tSource:     \t} . ($err->{Source}||q{})
+						, qq{\tSQLState:   \t} . ($err->{SQLState}||q{}));
 				}
 				$DBD::ADO::state = $err->{SQLState}
 					if $err->{SQLState};
@@ -1141,8 +1141,10 @@ my @sql_types_supported = ();
 		$conn->{CursorLocation} = $tmpCursorLocation;
 
 		DBI->connect('dbi:Sponge:','','', { RaiseError => 1 })->prepare(
-			$QueryType, { rows => \@Rows, NAME =>
-			[ qw( TABLE_CAT TABLE_SCHEM TABLE_NAME COLUMN_NAME DATA_TYPE TYPE_NAME COLUMN_SIZE BUFFER_LENGTH DECIMAL_DIGITS NUM_PREC_RADIX NULLABLE REMARKS COLUMN_DEF SQL_DATA_TYPE SQL_DATETIME_SUB CHAR_OCTET_LENGTH ORDINAL_POSITION IS_NULLABLE ) ]});
+			$QueryType, { rows => \@Rows
+			, NAME => [ qw( TABLE_CAT TABLE_SCHEM TABLE_NAME COLUMN_NAME DATA_TYPE TYPE_NAME COLUMN_SIZE BUFFER_LENGTH DECIMAL_DIGITS NUM_PREC_RADIX NULLABLE REMARKS COLUMN_DEF SQL_DATA_TYPE SQL_DATETIME_SUB CHAR_OCTET_LENGTH ORDINAL_POSITION IS_NULLABLE ) ]
+			, TYPE => [            12,         12,        12,         12,        5,       12,          4,            4,             5,             5,       5,     12,        12,            5,               5,                4,               4,         12   ]
+		});
 	}
 
 	sub primary_key_info {
@@ -1177,8 +1179,10 @@ my @sql_types_supported = ();
 			$conn->{CursorLocation} = $tmpCursorLocation;
 
 			DBI->connect('dbi:Sponge:','','', { RaiseError => 1 })->prepare(
-				$QueryType, { rows => \@Rows, NAME =>
-			[ qw( TABLE_CAT TABLE_SCHEM TABLE_NAME COLUMN_NAME KEY_SEQ PK_NAME ) ]});
+				$QueryType, { rows => \@Rows
+				, NAME => [ qw( TABLE_CAT TABLE_SCHEM TABLE_NAME COLUMN_NAME KEY_SEQ PK_NAME ) ]
+				, TYPE => [            12,         12,        12,         12,      5,     12   ]
+			});
 	}
 
   
@@ -1223,8 +1227,10 @@ my @sql_types_supported = ();
 		$conn->{CursorLocation} = $tmpCursorLocation;
 
 		DBI->connect('dbi:Sponge:','','', { RaiseError => 1 })->prepare(
-			$QueryType, { rows => \@Rows, NAME =>
-			[ qw( PKTABLE_CAT PKTABLE_SCHEM PKTABLE_NAME PKCOLUMN_NAME FKTABLE_CAT FKTABLE_SCHEM FKTABLE_NAME FKCOLUMN_NAME KEY_SEQ UPDATE_RULE DELETE_RULE FK_NAME PK_NAME DEFERRABILITY ) ]});
+			$QueryType, { rows => \@Rows
+			, NAME => [ qw( PKTABLE_CAT PKTABLE_SCHEM PKTABLE_NAME PKCOLUMN_NAME FKTABLE_CAT FKTABLE_SCHEM FKTABLE_NAME FKCOLUMN_NAME KEY_SEQ UPDATE_RULE DELETE_RULE FK_NAME PK_NAME DEFERRABILITY ) ]
+			, TYPE => [              12,           12,          12,           12,         12,           12,          12,           12,      5,          5,          5,     12,     12,            5   ]
+		});
 	}
 
   	sub type_info_all {
@@ -1797,20 +1803,24 @@ my @sql_types_supported = ();
 			my $p = $comm->Parameters;
 #			Determine if the Parameter is defined.
 			my $i = $p->Item( $pNum -1 );
-			if ($i->{Type} == $ado_consts->{adVarBinary} or
-					$i->{Type} == $ado_consts->{adLongVarBinary}
-			) {
-#					Deal with an image request.
-				my $sz = length $val;
-				#my $pic2 = Variant(VT_UI1|VT_ARRAY,$i->{Size});
-				my $pic = Variant(VT_UI1|VT_ARRAY,$sz + 10);
-				$pic->Put($val);
-				$i->{Value} = $pic;
-				$sth->trace_msg( "->(VarBinary) : ". $i->Size. " ". $i->Type. "\n");
+			if (defined($val)) {
+				if ($i->{Type} == $ado_consts->{adVarBinary} or
+						$i->{Type} == $ado_consts->{adLongVarBinary}
+				) {
+#						Deal with an image request.
+					my $sz = length $val;
+					#my $pic2 = Variant(VT_UI1|VT_ARRAY,$i->{Size});
+					my $pic = Variant(VT_UI1|VT_ARRAY,$sz + 10);
+					$pic->Put($val);
+					$i->{Value} = $pic;
+					$sth->trace_msg( "->(VarBinary) : ". $i->Size. " ". $i->Type. "\n");
+				} else {
+					$i->{Size} = $val? length $val: $aType->[2];
+					$i->{Value} = $val if $val;
+					$sth->trace_msg( "->(default) : ". $i->Size. " ". $i->Type. "\n");
+				}
 			} else {
-				$i->{Size} = $val? length $val: $aType->[2];
-				$i->{Value} = $val if $val;
-				$sth->trace_msg( "->(default) : ". $i->Size. " ". $i->Type. "\n");
+				$i->{Value} = Variant(VT_NULL);
 			}
 		return 1;
 		}
@@ -1883,20 +1893,24 @@ my @sql_types_supported = ();
 			# Convert the parameters as needed.
 			for (@bind_values) {
 				my $i = $p->Item($x);
-				# Fix from Jacqui Caren <jacqui.caren@ig.co.uk>,
-				if ($i->{Type} == $ado_consts->{adVarBinary} or
-					$i->{Type} == $ado_consts->{adLongVarBinary}
-				) {
-#					Deal with an image request.
-				my $sz = length $_;
-				#my $pic = Variant(VT_UI1|VT_ARRAY,$i->{Size});
-				my $pic = Variant(VT_UI1|VT_ARRAY,$sz + 10);
-				$pic->Put($_);
-				$i->{Value} = $pic;
-			} else {
-				$i->{Size} = length $_;
-				$i->{Value} = $_;
-			}
+				if (defined($_)) {
+					# Fix from Jacqui Caren <jacqui.caren@ig.co.uk>,
+					if ($i->{Type} == $ado_consts->{adVarBinary} or
+						$i->{Type} == $ado_consts->{adLongVarBinary}
+					) {
+#						Deal with an image request.
+					my $sz = length $_;
+					#my $pic = Variant(VT_UI1|VT_ARRAY,$i->{Size});
+					my $pic = Variant(VT_UI1|VT_ARRAY,$sz + 10);
+					$pic->Put($_);
+					$i->{Value} = $pic;
+					} else {
+						$i->{Size} = length $_;
+						$i->{Value} = $_;
+					}
+				} else {
+						$i->{Value} = Variant(VT_NULL);
+				}
 			$sth->trace_msg("-> Bind parameter (execute): " . $i->Type . "\n");
 				$x++;
 			}
