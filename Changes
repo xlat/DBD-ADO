@@ -1,3 +1,9 @@
+2003-11-23  2.80
+
+  Fixed a bug affecting OpenSchema (first row was fetched twice).
+
+  Improved the type handling of bind_param().
+
 2003-11-16  2.79
 
   Added t/51qi.t to test quoted identifiers (and removed similar

@@ -22,11 +22,11 @@ use DBI qw(:sql_types);
 
 use vars qw($VERSION $table_name %TestFieldInfo %LTestFieldInfo);
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 $table_name = 'PERL_DBD_TEST';
 
 %TestFieldInfo = (
- 'A' => [SQL_SMALLINT, SQL_TINYINT, SQL_NUMERIC, SQL_DECIMAL, SQL_FLOAT, SQL_REAL, SQL_DOUBLE]
+ 'A' => [SQL_INTEGER, SQL_SMALLINT, SQL_TINYINT, SQL_NUMERIC, SQL_DECIMAL, SQL_FLOAT, SQL_REAL, SQL_DOUBLE]
 ,'B' => [SQL_WVARCHAR, SQL_VARCHAR, SQL_WCHAR, SQL_CHAR]
 ,'C' => [SQL_WLONGVARCHAR, SQL_LONGVARCHAR, SQL_WVARCHAR, SQL_VARCHAR]
 ,'D' => [SQL_DATE, SQL_TIMESTAMP]
@@ -54,10 +54,11 @@ sub get_type_for_column {
 
 sub tab_create {
   my $dbh = shift;
+  my $tbl = shift || $table_name;
   {
     local ($dbh->{PrintError}, $dbh->{RaiseError}, $dbh->{Warn});
     $dbh->{PrintError} = $dbh->{RaiseError} = $dbh->{Warn} = 0;
-    $dbh->do("DROP TABLE $table_name");
+    $dbh->do("DROP TABLE $tbl");
   }
   # trying to use ADO to tell us what type of data to use, instead of the above.
   my $fields = undef;
@@ -86,7 +87,7 @@ sub tab_create {
     print "-- $fields\n";
   }
   print "Using fields: $fields\n";
-  return $dbh->do("CREATE TABLE $table_name( $fields )");
+  return $dbh->do("CREATE TABLE $tbl( $fields )");
 }
 
 sub tab_delete {

@@ -6,16 +6,73 @@ use warnings;
 use DBI();
 use DBD::ADO::Const();
 
-use vars qw($VERSION);
-
-$VERSION = '2.78';
+$DBD::ADO::TypeInfo::VERSION = '2.79';
 
 my $Enums = DBD::ADO::Const->Enums;
 my $Dt = $Enums->{DataTypeEnum};
 
+$DBD::ADO::TypeInfo::dbi2ado = {
+  DBI::SQL_GUID()            => $Dt->{adGUID}            # -11
+, DBI::SQL_WLONGVARCHAR()    => $Dt->{adLongVarWChar}    # -10
+, DBI::SQL_WVARCHAR()        => $Dt->{adVarWChar}        #  -9
+, DBI::SQL_WCHAR()           => $Dt->{adWChar}           #  -8
+# DBI::SQL_BIT()                                         #  -7
+, DBI::SQL_TINYINT()         => $Dt->{adTinyInt}         #  -6
+, -5                         => $Dt->{adBigInt}          # SQL_BIGINT
+, DBI::SQL_LONGVARBINARY()   => $Dt->{adLongVarBinary}   #  -4
+, DBI::SQL_VARBINARY()       => $Dt->{adVarBinary}       #  -3
+, DBI::SQL_BINARY()          => $Dt->{adBinary}          #  -2
+, DBI::SQL_LONGVARCHAR()     => $Dt->{adLongVarChar}     #  -1
+# DBI::SQL_UNKNOWN_TYPE()    =>                          #   0
+, DBI::SQL_CHAR()            => $Dt->{adChar}            #   1
+, DBI::SQL_NUMERIC()         => $Dt->{adNumeric}         #   2
+, DBI::SQL_DECIMAL()         => $Dt->{adDecimal}         #   3
+, DBI::SQL_INTEGER()         => $Dt->{adInteger}         #   4
+, DBI::SQL_SMALLINT()        => $Dt->{adSmallInt}        #   5
+, DBI::SQL_FLOAT()           => $Dt->{adSingle}          #   6
+# DBI::SQL_REAL()            =>                          #   7
+, DBI::SQL_DOUBLE()          => $Dt->{adDouble}          #   8
+, DBI::SQL_DATE()            => $Dt->{adDBDate}          #   9  # deprecated!
+# DBI::SQL_INTERVAL()        =>                          #  10
+, DBI::SQL_TIMESTAMP()       => $Dt->{adDBTimeStamp}     #  11  # deprecated!
+, DBI::SQL_VARCHAR()         => $Dt->{adVarChar}         #  12
+, DBI::SQL_BOOLEAN()         => $Dt->{adBoolean}         #  16
+, DBI::SQL_UDT()             => $Dt->{adUserDefined}     #  17
+# DBI::SQL_UDT_LOCATOR()     =>                          #  18
+# DBI::SQL_ROW()             =>                          #  19
+# DBI::SQL_REF()             =>                          #  20
+, 25                         => $Dt->{adBigInt}          # SQL_BIGINT
+, DBI::SQL_BLOB()            => $Dt->{adLongVarBinary}   #  30
+# DBI::SQL_BLOB_LOCATOR()    =>                          #  31
+, DBI::SQL_CLOB()            => $Dt->{adLongVarChar}     #  40
+# DBI::SQL_CLOB_LOCATOR()    =>                          #  41
+, DBI::SQL_ARRAY()           => $Dt->{adArray}           #  50
+# DBI::SQL_ARRAY_LOCATOR()   =>                          #  51
+# DBI::SQL_MULTISET()        =>                          #  55
+# DBI::SQL_MULTISET_LOCATOR()=>                          #  56
+, DBI::SQL_TYPE_DATE()       => $Dt->{adDBDate}          #  91
+, DBI::SQL_TYPE_TIME()       => $Dt->{adDBTime}          #  92
+, DBI::SQL_TYPE_TIMESTAMP()  => $Dt->{adDBTimeStamp}     #  93
+# DBI::SQL_TYPE_TIME_WITH_TIMEZONE()                     #  94
+# DBI::SQL_TYPE_TIMESTAMP_WITH_TIMEZONE()                #  95
+# DBI::SQL_INTERVAL_YEAR()                               #  101
+# DBI::SQL_INTERVAL_MONTH()                              #  102
+# DBI::SQL_INTERVAL_DAY()                                #  103
+# DBI::SQL_INTERVAL_HOUR()                               #  104
+# DBI::SQL_INTERVAL_MINUTE()                             #  105
+# DBI::SQL_INTERVAL_SECOND()                             #  106
+# DBI::SQL_INTERVAL_YEAR_TO_MONTH()                      #  107
+# DBI::SQL_INTERVAL_DAY_TO_HOUR()                        #  108
+# DBI::SQL_INTERVAL_DAY_TO_MINUTE()                      #  109
+# DBI::SQL_INTERVAL_DAY_TO_SECOND()                      #  110
+# DBI::SQL_INTERVAL_HOUR_TO_MINUTE()                     #  111
+# DBI::SQL_INTERVAL_HOUR_TO_SECOND()                     #  112
+# DBI::SQL_INTERVAL_MINUTE_TO_SECOND()                   #  113
+};
+
 my $ado2dbi = {
   $Dt->{adArray}            => DBI::SQL_ARRAY
-# $Dt->{adBigInt}           => DBI::SQL_BIGINT
+, $Dt->{adBigInt}           => 25
 , $Dt->{adBinary}           => DBI::SQL_BINARY
 , $Dt->{adBoolean}          => DBI::SQL_BOOLEAN
 , $Dt->{adBSTR}             => DBI::SQL_UNKNOWN_TYPE
@@ -43,15 +100,15 @@ my $ado2dbi = {
 , $Dt->{adSingle}           => DBI::SQL_FLOAT
 , $Dt->{adSmallInt}         => DBI::SQL_SMALLINT
 , $Dt->{adTinyInt}          => DBI::SQL_TINYINT
-, $Dt->{adUnsignedBigInt}   => DBI::SQL_UNKNOWN_TYPE
-, $Dt->{adUnsignedInt}      => DBI::SQL_WCHAR
-, $Dt->{adUnsignedSmallInt} => DBI::SQL_UNKNOWN_TYPE
-, $Dt->{adUnsignedTinyInt}  => DBI::SQL_UNKNOWN_TYPE
-, $Dt->{adUserDefined}      => DBI::SQL_UNKNOWN_TYPE
+, $Dt->{adUnsignedBigInt}   => 25
+, $Dt->{adUnsignedInt}      => DBI::SQL_INTEGER
+, $Dt->{adUnsignedSmallInt} => DBI::SQL_SMALLINT
+, $Dt->{adUnsignedTinyInt}  => DBI::SQL_TINYINT
+, $Dt->{adUserDefined}      => DBI::SQL_UDT
 , $Dt->{adVarBinary}        => DBI::SQL_VARBINARY
 , $Dt->{adVarChar}          => DBI::SQL_VARCHAR
 , $Dt->{adVariant}          => DBI::SQL_UNKNOWN_TYPE
-, $Dt->{adVarNumeric}       => DBI::SQL_INTEGER
+, $Dt->{adVarNumeric}       => DBI::SQL_NUMERIC
 , $Dt->{adVarWChar}         => DBI::SQL_WVARCHAR
 , $Dt->{adWChar}            => DBI::SQL_WCHAR
 };
@@ -86,10 +143,6 @@ sub ado2dbi {
 #  return $dbh->set_err( $DBD::ADO::err || -1,
 #    "convert_ado_to_odbc: call without any attributes.")
 #  unless $AdoType;
-
-#  unless( $dbh->{ado_types_supported} ) {
-#    &_determine_type_support($dbh);
-#  }
 
   my $SqlType = 0;
 

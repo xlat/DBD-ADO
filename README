@@ -87,40 +87,70 @@ Enhanced DBI Methods
 
   prepare
 
-    The prepare methods allows attributes: (from DBI)
+    The prepare methods allows attributes (see DBI):
 
-        "prepare"
-              $sth = $dbh->prepare($statement)          or die $dbh->errstr;
-              $sth = $dbh->prepare($statement, \%attr)  or die $dbh->errstr;
+      $sth = $dbh->prepare( $statement )          or die $dbh->errstr;
+      $sth = $dbh->prepare( $statement, \%attr )  or die $dbh->errstr;
 
-                    prepare supports setting the CursorType.
-                            $sth = $dbh->prepare( $statement, { CursorType => 'adOpenForwardOnly' } ) ...
-                                    Cursortypes adOpenForwardOnly(default), adOpenKeyset, adOpenDynamic, adOpenStatic
+    DBD::ADO's prepare() supports setting the CursorType, e.g.:
 
-                    When using a statement handle within a statement handle:
-                            while( my $table = $sth1->fetchrow_hashref ) {
-                                    ...
-                                    my $col = $sth2->fetchrow_hashref;
-                                    ...
-                            }
-                    It may be necessary to prepare the statement using CursorType => adOpenStatic.
+      $sth = $dbh->prepare( $statement, { CursorType => 'adOpenForwardOnly' } ) ...
 
-                    Changing the CursorType is a solution to the following problem.
-                            Can't execute statement 'select * from authors':
-                            Lasterror:       -2147467259: OLE exception from "Microsoft OLE DB Provider for SQL Server":
+    Possible cursortypes are:
 
-                            Cannot create new connection because in manual or distributed transaction
-                            mode.
+      adOpenForwardOnly (default)
+      adOpenKeyset
+      adOpenDynamic
+      adOpenStatic
 
-                            Win32::OLE(0.1403) error 0x80004005: "Unspecified error"
-                                            in METHOD/PROPERTYGET "Open"
-                                                            Description:    Cannot create new connection because in manual or distributed transactio
-                                                            HelpContext:    0
-                                                            HelpFile:
-                                                            NativeError:    0
-                                                            Number:         -2147467259
-                                                            Source:         Microsoft OLE DB Provider for SQL Server
-                                                            SQLState:
+    It may be necessary to prepare the statement using cursortype 'adOpenStatic'
+    when using a statement handle within a statement handle:
+
+      while( my $table = $sth1->fetchrow_hashref ) {
+        ...
+        my $col = $sth2->fetchrow_hashref;
+        ...
+      }
+
+    Changing the CursorType is a solution to the following problem:
+
+      Can't execute statement 'select * from authors':
+      Lasterror : -2147467259
+      OLE exception from "Microsoft OLE DB Provider for SQL Server":
+
+      Cannot create new connection because in manual or distributed transaction
+      mode.
+
+      Win32::OLE(0.1403) error 0x80004005: "Unspecified error"
+          in METHOD/PROPERTYGET "Open"
+
+              Description : Cannot create new connection because in manual or distributed transaction mode.
+              HelpContext : 0
+              HelpFile    :
+              NativeError : 0
+              Number      : -2147467259
+              Source      : Microsoft OLE DB Provider for SQL Server
+              SQLState    :
+
+
+  bind_param
+
+    Normally, the datatypes of placeholders are known after the statement is
+    prepared. In this case, you don't need to provide any type information:
+
+      $sth->bind_param( 1, $value );
+
+    Sometimes, you need to specify a type for the parameter, e.g.:
+
+      $sth->bind_param( 1, $value, SQL_NUMERIC );
+
+    As a last resort, you can provide an ADO-specific type, e.g.:
+
+      $sth->bind_param( 1, $value, { ado_type => 6 } );  # adCurrency
+
+    If no type is given (neither by the provider nor by you), the datatype
+    defaults to SQL_VARCHAR (adVarChar).
+
 
   table_info
 

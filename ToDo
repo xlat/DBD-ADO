@@ -5,7 +5,7 @@ install_method('ado_open_schema')
 
 Adjust return codes wrt the spec
 
-Improve bind_param for types other than Varchar, add more tests.
+Change tests to use bind_param() more often.
 
 Add $sth->{ParamValues}
 
