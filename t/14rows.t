@@ -11,7 +11,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 17;
+  plan tests => 18;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -68,6 +68,7 @@ SQL
 my $sth = $dbh->prepare( $sql );
 ok( defined $sth,'Prepared insert select statement');
 my $rc = $sth->execute;
+is( ref $rc, undef,"Not a Win32::OLE::Variant (or other) object?");
 is( $rc, $MAX_ROWS,"Execute returned $MAX_ROWS rows");
 is( $sth->rows, $rc,"Execute sth->rows returned $rc");
 

@@ -4,285 +4,35 @@ NAME
 
 SYNOPSIS
 
-  use DBI;
+  use DBI();
 
-  $dbh = DBI->connect("dbi:ADO:dsn", $user, $passwd);
-
-    Options in the connect string:
-    dbi:ADO:dsn;CommandTimeout=60 (your number)
-    dbi:ADO:dsn;ConnectTimeout=60 (your number)
-    or include both ConnectTimeout and CommandTimeout.
-
-    The dsn may be a standard ODBC dsn or a dsn-less.
-    See the ADO documentation for more information on
-    the dsn-less connection.
-
-  # See the DBI module documentation for full details
+  my $dbh = DBI->connect("dbi:ADO:$dsn", $user, $passwd );
 
 DESCRIPTION
 
   The DBD::ADO module supports ADO access on a Win32 machine. DBD::ADO is
   written to support the standard DBI interface to data sources.
 
-Connection
+INSTALLATION
 
-    $dbh = DBI->connect("dbi:ADO:$dsn", $user, $passwd, $attribs );
+  To install this module type the following:
 
-  Connection supports dsn and dsn-less calls.
+     perl Makefile.PL
+     make
+     make test
+     make install
 
-    $dbh = DBI->connect('dbi:ADO:File Name=oracle.udl', $user, $passwd,
-      { RaiseError => [0|1], PrintError => [0|1], AutoCommit => [0|1]} );
+  You need to use the correct make command. That may be nmake or dmake,
+  depending on which development environment you are using.
+  If using the Win32 ActiveState build then it is recommended that you
+  use the ppm utility to fetch and install the module instead.
 
-  In addition the following attributes may be set in the connect string:
+PREREQUISITES
 
-    Attributes
-    CommandTimeout
-    ConnectionString
-    ConnectionTimeout
-    CursorLocation
-    DefaultDatabase
-    IsolationLevel
-    Mode
-    Provider
+  DBI
+  Win32::OLE
 
-  Warning: The application is responsible for passing the correct
-  information when setting any of these attributes.
-
-
-ADO-specific methods
-
-  ado_open_schema
-
-      $sth = $dbh->ado_open_schema( $QueryType, @Criteria ) or die ...;
-
-    This method can be used to obtain database schema information from the
-    provider.
-    It returns a valid statement handle upon success.
-
-    $QueryType may be any valid ADO SchemaEnum name such as
-
-      adSchemaTables
-      adSchemaIndexes
-      adSchemaProviderTypes
-
-    @Criteria (optional) is a list of query constraints depending on each
-    $QueryType.
-
-    Example:
-
-      my $sth = $dbh->ado_open_schema('adSchemaCheckConstraints','Catalog1');
-
-    Note: With DBI version 1.36 and earlier, the func() method has to be used
-    to call private methods implemented by the driver:
-
-      $h->func( @func_arguments, $func_name ) or die ...;
-
-    where $func_name is 'ado_open_schema'.
-    You can use 'OpenSchema' for backward compatibility.
-
-    Example:
-
-      my $sth = $dbh->func('adSchemaCheckConstraints','Catalog1','OpenSchema');
-
-    See ex/OpenSchema.pl for a working example.
-
-
-DBI Methods
-
-  data_sources
-
-    Because ADO doesn't provide a data source repository, DBD::ADO uses it's
-    own. It tries to load Local::DBD::ADO::DSN and expects an array of hashes
-    describing the data sources. See ex/Local/DBD/ADO/DSN.pm for an example.
-
-    Warning: This is experimental and may change.
-
-    Warning: Check for the unlikly case that a file Local/DBD/ADO/DSN.pm
-    exists in your module search path which causes unwanted side effects when
-    loaded.
-
-
-Enhanced DBI Methods
-
-  prepare
-
-    The prepare methods allows attributes (see DBI):
-
-      $sth = $dbh->prepare( $statement )          or die $dbh->errstr;
-      $sth = $dbh->prepare( $statement, \%attr )  or die $dbh->errstr;
-
-    DBD::ADO's prepare() supports setting the CursorType, e.g.:
-
-      $sth = $dbh->prepare( $statement, { CursorType => 'adOpenForwardOnly' } ) ...
-
-    Possible cursortypes are:
-
-      adOpenForwardOnly (default)
-      adOpenKeyset
-      adOpenDynamic
-      adOpenStatic
-
-    It may be necessary to prepare the statement using cursortype 'adOpenStatic'
-    when using a statement handle within a statement handle:
-
-      while( my $table = $sth1->fetchrow_hashref ) {
-        ...
-        my $col = $sth2->fetchrow_hashref;
-        ...
-      }
-
-    Changing the CursorType is a solution to the following problem:
-
-      Can't execute statement 'select * from authors':
-      Lasterror : -2147467259
-      OLE exception from "Microsoft OLE DB Provider for SQL Server":
-
-      Cannot create new connection because in manual or distributed transaction
-      mode.
-
-      Win32::OLE(0.1403) error 0x80004005: "Unspecified error"
-          in METHOD/PROPERTYGET "Open"
-
-              Description : Cannot create new connection because in manual or distributed transaction mode.
-              HelpContext : 0
-              HelpFile    :
-              NativeError : 0
-              Number      : -2147467259
-              Source      : Microsoft OLE DB Provider for SQL Server
-              SQLState    :
-
-
-  bind_param
-
-    Normally, the datatypes of placeholders are known after the statement is
-    prepared. In this case, you don't need to provide any type information:
-
-      $sth->bind_param( 1, $value );
-
-    Sometimes, you need to specify a type for the parameter, e.g.:
-
-      $sth->bind_param( 1, $value, SQL_NUMERIC );
-
-    As a last resort, you can provide an ADO-specific type, e.g.:
-
-      $sth->bind_param( 1, $value, { ado_type => 6 } );  # adCurrency
-
-    If no type is given (neither by the provider nor by you), the datatype
-    defaults to SQL_VARCHAR (adVarChar).
-
-
-  table_info
-
-    Warning: This method is experimental and may change or disappear.
-
-      $sth = $dbh->table_info(\%attr);
-
-      $sth = $dbh->table_info({
-              TABLE_TYPE => 'VIEW',
-              ADO_Columns => 1,
-              Trim_Catalog => 0,
-              Filter => q{TABLE_NAME LIKE 'C%'},
-      });
-
-    Returns an active statement handle that can be used to fetch information
-    about tables and views that exist in the database. By default the handle
-    contains the columns described in the DBI documentation:
-
-      TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
-
-    ADO_Columns
-    Additional ADO-only fields will be included if the ADO_Columns attribute
-    is set to true:
-
-      %attr = (ADO_Columns => 1);
-
-    Trim_Catalog
-    Some ADO providers include path info in the TABLE_CAT column. This
-    information will be trimmed if the Trim_Catalog attribute is set to
-    true:
-
-      %attr = (Trim_Catalog => 1);
-
-    Criteria
-    The ADO driver allows column criteria to be specified. In this way the
-    record set can be restricted, for example, to only include tables of
-    type 'VIEW':
-
-      %attr = (TABLE_TYPE => 'VIEW')
-
-    You can add criteria for any of the following columns:
-
-      TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE
-
-    Filter
-    The ADO driver also allows the recordset to be filtered on a Criteria
-    string: a string made up of one or more individual clauses concatenated
-    with AND or OR operators.
-
-      %attr = (Filter => q{TABLE_TYPE LIKE 'SYSTEM%'})
-
-    The criteria string is made up of clauses in the form
-    FieldName-Operator-Value. This is more flexible than using column
-    criteria in that the filter allows a number of operators:
-
-      <, >, <=, >=, <>, =, or LIKE
-
-    The Fieldname must be one of the ADO 'TABLES Rowset' column names:
-
-      TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION,
-      TABLE_GUID, TABLE_PROPID, DATE_CREATED, DATE_MODIFIED
-
-    Value is the value with which you will compare the field values (for
-    example, 'Smith', #8/24/95#, 12.345, or $50.00). Use single quotes with
-    strings and pound signs (#) with dates. For numbers, you can use decimal
-    points, dollar signs, and scientific notation. If Operator is LIKE,
-    Value can use wildcards. Only the asterisk (*) and percent sign (%) wild
-    cards are allowed, and they must be the last character in the string.
-    Value cannot be null.
-
-  tables
-
-    Warning: This method is experimental and may change or disappear.
-
-      @names = $dbh->tables(\%attr);
-
-    Returns a list of table and view names. Accepts any of the attributes
-    described in the the table_info manpage method:
-
-      @names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
-
-CAVEATS
-
-  Character set
-
-    Proper Unicode support depends on all components involved in your
-    application: the DBMS, the ADO provider, Perl and some perl modules.
-
-    In short: Perl 5.8 and Win32::OLE 0.16 (or later) are strongly
-    recommended and Win32::OLE has to be prepared to use the correct
-    codepage:
-
-      Win32::OLE->Option( CP => Win32::OLE::CP_UTF8 );
-
-    More detailed notes can be found at
-
-      http://purl.net/stefan_ram/pub/perl_unicode_en
-
-  Type info
-
-    Support for type_info_all is supported, however, you're not using
-    a true OLE DB provider (using the MS OLE DB -> ODBC), the first
-    hash may not be the "best" solution for the data type.
-    adSchemaProviderTypes does provide for a "best match" column, however
-    the MS OLE DB -> ODBC provider does not support the best match.
-    Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
-
-ADO
-
-  It is strongly recommended that you use the latest version of ADO (2.1
-  at the time this was written). You can download it from:
-
-    http://www.microsoft.com/Data/download.htm
+  ADO (http://www.microsoft.com/Data/download.htm)
 
 AUTHORS
 
@@ -308,16 +58,9 @@ COPYRIGHT
   Copyright (c) 2001, Tim Bunce, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2002, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
+  Copyright (c) 2004, Steffen Goeldner
 
   All rights reserved.
 
   You may distribute under the terms of either the GNU General Public
   License or the Artistic License, as specified in the Perl README file.
-
-SEE ALSO
-
-  ADO Reference book: ADO 2.0 Programmer's Reference, David Sussman and
-  Alex Homer, Wrox, ISBN 1-861001-83-5. If there's anything better please
-  let me know.
-
-  http://www.able-consulting.com/tech.htm

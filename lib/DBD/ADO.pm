@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state);
 
-  $VERSION = '2.83';
+  $VERSION = '2.84';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    = 0;      # The $DBI::err value
@@ -396,7 +396,7 @@ my $sch_dbi_to_ado = {
 		my $conn = $dbh->{ado_conn};
 
 		my $comm = Win32::OLE->new('ADODB.Command');
-		my $lastError = Win32::OLE->LastError;
+		my $lastError = DBD::ADO::errors($conn);
 		return $dbh->set_err( $DBD::ADO::err || -1,
 			"Can't create 'object ADODB.Command': $lastError")
 		if $lastError;
@@ -540,7 +540,6 @@ my $sch_dbi_to_ado = {
 		$dbh->trace_msg( "-> _rs_sth_prepare: Create statement handle from RecordSet\n" );
 
 		my $conn = $dbh->FETCH("ado_conn");
-		my $rows;
 		my $ado_fields = [ Win32::OLE::in($rs->Fields) ];
 
 		my ($outer, $sth) = DBI::_new_sth($dbh, {
@@ -650,8 +649,7 @@ my $sch_dbi_to_ado = {
 			&& (defined $attribs->{TABLE_NAME}  and $attribs->{TABLE_NAME}  eq '') ) { # Rule 19a
 			# This is the easy way to determine catalog support.
 			eval {
-				local $Win32::OLE::Warn;
-				$Win32::OLE::Warn = 0;
+				local $Win32::OLE::Warn = 0;
 				$oRec = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaCatalogs});
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
 				$lastError = undef if $lastError =~ m/0x80020007/;
@@ -694,8 +692,7 @@ my $sch_dbi_to_ado = {
 				 && (defined $attribs->{TABLE_SCHEM} and $attribs->{TABLE_SCHEM} eq '%')
 				 && (defined $attribs->{TABLE_NAME} and $attribs->{TABLE_NAME}  eq '') ) { # Rule 19b
 			eval {
-				local $Win32::OLE::Warn;
-				$Win32::OLE::Warn = 0;
+				local $Win32::OLE::Warn = 0;
 				$oRec = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaSchemata});
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
 				$lastError = undef if $lastError =~ m/0x80020007/;
@@ -755,8 +752,7 @@ my $sch_dbi_to_ado = {
 			}
 
 			eval {
-				local $Win32::OLE::Warn;
-				$Win32::OLE::Warn = 0;
+				local $Win32::OLE::Warn = 0;
 				$oRec = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaTables}, \@criteria);
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
 				$lastError = undef if $lastError =~ m/0x80020007/;
@@ -1458,25 +1454,20 @@ my $sch_dbi_to_ado = {
 
 	sub execute {
 		my ($sth, @bind_values) = @_;
-		my $comm = $sth->{ado_comm};
 		my $conn = $sth->{ado_conn};
-		my $sql  = $sth->FETCH("Statement");
+		my $comm = $sth->{ado_comm};
+		my $sql  = $sth->FETCH('Statement');
 
-		$sth->trace_msg("-> execute state handler\n");
-		# If a record set is currently defined,
-		# release the set.
+		# If a record set is currently defined, release the set.
 		my $ors = $sth->{ado_rowset};
-		if (defined $ors) {
-			$ors->Close () if $ors and
+		if ( defined $ors ) {
+			$ors->Close if $ors and
 				$ors->State & $ado_consts->{ObjectStateEnum}{adStateOpen};
-			$sth->STORE(ado_rowset => undef);
+			$sth->{ado_rowset} = undef;
 			$ors = undef;
 		}
 
-		#
-		# If the application is excepting arguments, then
-		# process them here.
-		#
+    # If the application is excepting arguments, then process them here.
     for ( 1 .. @bind_values ) {
       $sth->bind_param( $_, $bind_values[$_-1] ) or return;
     }
@@ -1492,61 +1483,59 @@ my $sch_dbi_to_ado = {
 
 		my $not_supported = ( $DBD::ADO::err eq NOT_SUPPORTED ) || 0;
 
-		$sth->trace_msg( "  -> Not Supported flag: $not_supported\n" );
+		$sth->trace_msg("    -- Not Supported flag: $not_supported\n", 5 );
 
 		my $parm_cnt = 0;
 		# Need to test if we can access the parameter attributes.
 		{
 			# Turn the OLE Warning Off for this test.
-			local ($Win32::OLE::Warn);
-			$Win32::OLE::Warn = 0;
+			local $Win32::OLE::Warn = 0;
 			$parm_cnt = $p->{Count};
 			$lastError = DBD::ADO::errors($conn);
 			$not_supported = ( $DBD::ADO::err eq EXCEPTION_OCC ) || 0;
 		}
 
-		$sth->trace_msg( "  -> Is the Parameter Object Supported? " . ($not_supported ? 'No' : 'Yes') . "\n" );
+		$sth->trace_msg("    -- Is the Parameter Object Supported? " . ($not_supported ? 'No' : 'Yes') . "\n", 5 );
 
 		# Remember if the provider errored with a "not supported" message.
-
-		my $x = 0;
 
 		# If the provider errored with not_supported above in the Parameters
 		# methods, do not attempt to display anything about the object.  If we
 		# it triggers warning message.
-		unless($not_supported) {
-			$sth->trace_msg( "-> Parameter count: " . $p->{Count} . "\n");
-			while( $x < $p->{Count} ) {
+		unless ( $not_supported ) {
+			$sth->trace_msg("    -- Parameter count: " . $p->{Count} . "\n", 5 );
+			my $x = 0;
+			while ( $x < $p->{Count} ) {
 				my $params = $sth->{ado_params};
-				$sth->trace_msg( "-> Parameter $x: " . ($p->Item($x)->{Value}|| 'undef') . "\n");
-				$sth->trace_msg( "-> Parameter $x: " . ($params->[$x]||'undef') . "\n");
+				$sth->trace_msg("    -- Parameter $x: " . ($p->Item($x)->{Value}||'undef') . "\n", 5 );
+				$sth->trace_msg("    -- Parameter $x: " . ($params->[$x]||'undef') . "\n", 5 );
 				$x++;
 			}
 		}
 
-		# At this point a command is ready to execute.  To allow for different
-		# type of cursors, I need to create a recordset object.
-
 		# Return the affected number to rows.
 		my $rows = Win32::OLE::Variant->new( $VT_I4_BYREF, 0 );
 
+		# At this point a command is ready to execute.  To allow for different
+		# type of cursors, I need to create a recordset object.
 		# However, a RecordSet Open does not return affected rows.  So I need to
 		# determine if a recordset open is needed, or a command execute.
-		# print "usecmd ", exists $sth->{ado_usecmd},			defined $sth->{ado_usecmd}, "\n";
-		# print "CursorType ", exists $sth->{ado_attribs}->{CursorType},  defined $sth->{ado_attribs}->{CursorType}, "\n";
-		# print "cursortype ", exists $sth->{ado_cursortype}, defined $sth->{ado_cursortype}, "\n";
-		# print "users ", exists $sth->{ado_users},			defined $sth->{ado_users}, "\n";
+
+		# print "usecmd "    , exists $sth->{ado_usecmd}               , defined $sth->{ado_usecmd}               , "\n";
+		# print "CursorType ", exists $sth->{ado_attribs}->{CursorType}, defined $sth->{ado_attribs}->{CursorType}, "\n";
+		# print "cursortype ", exists $sth->{ado_cursortype}           , defined $sth->{ado_cursortype}           , "\n";
+		# print "users "     , exists $sth->{ado_users}                , defined $sth->{ado_users}                , "\n";
 
 		my $UseRecordSet = (
-			   not (exists $sth->{ado_usecmd}			and defined $sth->{ado_usecmd})
-			&& ((exists $sth->{ado_attribs}->{CursorType} and defined $sth->{ado_attribs}->{CursorType})
-			|| (exists $sth->{ado_cursortype} and defined $sth->{ado_cursortype})
-			|| (exists $sth->{ado_users}			and defined $sth->{ado_users}))
+			not  ( exists $sth->{ado_usecmd}                and defined $sth->{ado_usecmd} )
+			&& ( ( exists $sth->{ado_attribs}->{CursorType} and defined $sth->{ado_attribs}->{CursorType} )
+			  || ( exists $sth->{ado_cursortype}            and defined $sth->{ado_cursortype} )
+			  || ( exists $sth->{ado_users}                 and defined $sth->{ado_users} ) )
 		);
 
 		if ( $UseRecordSet ) {
 			$rs = Win32::OLE->new('ADODB.RecordSet');
-			$lastError = Win32::OLE->LastError;
+			$lastError = DBD::ADO::errors($conn);
 			return $sth->set_err( $DBD::ADO::err || -1,
 				"Can't create 'object ADODB.RecordSet': $lastError")
 			if $lastError;
@@ -1555,8 +1544,8 @@ my $sch_dbi_to_ado = {
 			my $cursortype = $ado_consts->{CursorTypeEnum}{adOpenForwardOnly};
 			if ( exists $sth->{ado_attribs}->{CursorType} ) {
 				my $type = $sth->{ado_attribs}->{CursorType};
-				if (exists $ado_consts->{CursorTypeEnum}{$type}) {
-					$sth->trace_msg( "  -> Changing the cursor type to $type\n" );
+				if ( exists $ado_consts->{CursorTypeEnum}{$type} ) {
+					$sth->trace_msg("    -- Changing the cursor type to $type\n", 5 );
 					$cursortype = $ado_consts->{CursorTypeEnum}{$type};
 				} else {
 					warn "Attempting to use an invalid CursorType: $type : using default adOpenForwardOnly";
@@ -1566,24 +1555,21 @@ my $sch_dbi_to_ado = {
 			# Call to clear any previous error messages.
 			$lastError = DBD::ADO::errors($conn);
 
-			$sth->trace_msg( "  Open record set using cursor type: $cursortype\n" );
+			$sth->trace_msg("  -- Open record set using cursor type: $cursortype\n", 5 );
 			$rs->Open( $comm, undef, $cursortype );
-
-			# Execute the statement, get a recordset in return.
-			# $rs = $comm->Execute($rows);
 			$lastError = DBD::ADO::errors($conn);
 			return $sth->set_err( $DBD::ADO::err || -1,
 					"Can't execute statement '$sql': $lastError")
 			if $lastError;
 		} else {
-			# Execute the command.
 			# Execute the statement, get a recordset in return.
-			$rs = $comm->Execute($rows);
+			$rs = $comm->Execute( $rows );
 			$lastError = DBD::ADO::errors($conn);
 			return $sth->set_err( $DBD::ADO::err || -1,
 					"Can't execute statement '$sql': $lastError")
 			if $lastError;
 		}
+    $rows = $rows->Value;  # to make a DBD::Proxy client w/o Win32::OLE happy
     my $ado_fields = [];
     # some providers close the rs, e.g. after DROP TABLE
     if ( defined $rs and $rs->State ) {
@@ -1596,77 +1582,53 @@ my $sch_dbi_to_ado = {
     $sth->{ado_fields} = $ado_fields;
 		my $num_of_fields = @$ado_fields;
 
-		if ($num_of_fields == 0) {	# assume non-select statement
-
-			# Determine the effected row count?
-			my $c = ($rows->Value == 0 ? qq{0E0} : $rows->Value);
-			$sth->{ado_rows} = $rows;
-			$sth->trace_msg("<- executed state handler (no recordset)\n");
+		if ( $num_of_fields == 0 ) {  # assume non-select statement
+			$sth->trace_msg("    -- no fields (non-select statement?)\n", 5 );
 			# Clean up the record set that isn't used.
-			if (defined $rs and (ref $rs) =~ /Win32::OLE/) {
-				$rs->Close () if $rs and
+			if ( defined $rs and (ref $rs) =~ /Win32::OLE/) {
+				$rs->Close if $rs and
 					$rs->State & $ado_consts->{ObjectStateEnum}{adStateOpen};
 			}
 			$rs = undef;
-			return ( $c );
+			$sth->{ado_rows} = $rows;
+			return $rows || '0E0';
 		}
 
-		$sth->STORE( ado_rowset => $rs );
-
 		# Current setting of RowsInCache?
-		my $rowcache = $sth->FETCH( 'RowCacheSize' );
-		if ( defined $rowcache and $rowcache > 0 ) {
-			my $currowcache = $rs->CacheSize( );
-			$sth->trace_msg( "  changing the CacheSize using RowCacheSize: $rowcache" );
+		my $rowcache = $sth->FETCH('RowCacheSize');
+		if ( defined $rowcache && $rowcache > 0 ) {
+			my $currowcache = $rs->CacheSize;
+			$sth->trace_msg("    -- changing the CacheSize using RowCacheSize: $rowcache\n", 5 );
 			$rs->CacheSize( $rowcache ) unless $rowcache == $currowcache;
 			$lastError = DBD::ADO::errors($conn);
 			return $sth->set_err( $DBD::ADO::err || -1,
-				"  Unable to change CacheSize to RowCacheSize : $rowcache : $lastError")
+				"Unable to change CacheSize to RowCacheSize : $rowcache : $lastError")
 			if $lastError;
 			warn "Changed CacheSize\n";
 		}
 
-		my $nof = $sth->FETCH('NUM_OF_FIELDS');
-		$sth->STORE(Active => 1);
-		$sth->STORE('NUM_OF_FIELDS' => $num_of_fields)
-			unless ($nof == $num_of_fields);
-		$sth->STORE( NAME				=> [ map { $_->Name } @$ado_fields ] );
-		$sth->STORE( TYPE				=> [ map {
-						scalar DBD::ADO::TypeInfo::ado2dbi( $_->Type )
-					} @$ado_fields ] );
-		$sth->STORE( PRECISION	=> [ map { $_->Precision } @$ado_fields ] );
-		$sth->STORE( SCALE			=> [
-			map { $_->NumericScale } @$ado_fields ] );
-		$sth->STORE( NULLABLE		=>
-			[
-				map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayBeNull}? 1 : 0 }
-						@$ado_fields
-			]
-		);
+		$sth->STORE('Active'        , 1 );
+		$sth->STORE('CursorName'    , undef );
+		$sth->STORE('Statement'     , $rs->Source );
+		$sth->STORE('RowsInCache'   , $rs->CacheSize );
+		$sth->STORE('NUM_OF_FIELDS' , $num_of_fields ) unless $num_of_fields == $sth->FETCH('NUM_OF_FIELDS');
+		$sth->STORE('NAME'          , [ map { $_->Name } @$ado_fields ] );
+		$sth->STORE('TYPE'          , [ map { scalar DBD::ADO::TypeInfo::ado2dbi( $_->Type ) } @$ado_fields ] );
+		$sth->STORE('PRECISION'     , [ map { $_->Precision } @$ado_fields ] );
+		$sth->STORE('SCALE'         , [ map { $_->NumericScale } @$ado_fields ] );
+		$sth->STORE('NULLABLE'      , [ map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayBeNull}? 1 : 0 } @$ado_fields ] );
+		$sth->STORE('ado_type'      , [ map { $_->Type } @$ado_fields ] );
 
-		$sth->STORE( ado_type		=> [ map { $_->Type } @$ado_fields ] );
+		# print 'May Defer', join(', ', map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayDefer} ? 1 : 0 } @$ado_fields ), "\n";
+		# print 'Is Long  ', join(', ', map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldLong}     ? 1 : 0 } @$ado_fields ), "\n";
 
-		# print "May Defer"
-		# 	, join( ", "
-		# 		, map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayDefer}? 1 : 0 }
-		# 				@$ado_fields ), "\n";
-		# print "Is Long"
-		# 	, join( ", "
-		# 		, map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldLong}? 1 : 0 }
-		# 				@$ado_fields ), "\n";
-
-		$sth->STORE( CursorName		=> undef);
-		$sth->STORE( Statement		=> $rs->Source);
-		$sth->STORE( RowsInCache	=> $rs->CacheSize);
-
+		$sth->{ado_rowset} = $rs;
 		$sth->{ado_rownum} = 0;
-		$sth->{ado_rows} = $rows;  # $rs->RecordCount
+		$sth->{ado_rows}   = $rows;  # $rs->RecordCount
 
 		# We need to return a true value for a successful select
 		# -1 means total row count unavailable
-		$sth->trace_msg("<- executed state handler\n");
-
-		return $rows || '0E0';  # $rs->RecordCount
+		return $rows || '0E0';  # seems more reliable than $rs->RecordCount
   }
 
 	sub rows {
@@ -1746,10 +1708,10 @@ my $sch_dbi_to_ado = {
 
 	sub finish {
 		my ($sth) = @_;
-		my $rs = $sth->FETCH('ado_rowset');
+		my $rs = $sth->{ado_rowset};
 		$rs->Close () if $rs and
 			$rs->State & $ado_consts->{ObjectStateEnum}{adStateOpen};
-		$sth->STORE(ado_rowset => undef);
+		$sth->{ado_rowset} = undef;
 		return $sth->STORE(Active => 0);
 	}
 
@@ -1804,7 +1766,6 @@ my $sch_dbi_to_ado = {
 				and ($rs->State != $ado_consts->{ObjectStateEnum}{adStateClosed}));
 		$rs = undef;
 		$sth->{ado_rowset} = undef;
-		$sth->STORE(ado_rowset => undef);
     $sth->STORE(Active => 0);
 		$sth->trace_msg("-> destroy statement handler\n", 1 );
 
@@ -2132,6 +2093,7 @@ dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
   Copyright (c) 2001, Tim Bunce, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2002, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
+  Copyright (c) 2004, Steffen Goeldner
 
   All rights reserved.
 

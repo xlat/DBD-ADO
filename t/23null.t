@@ -1,64 +1,46 @@
-#!/usr/bin/perl -I./t
-# vim:ts=2:sw=2:aw:ai:sta:
+#!perl -I./t
+
 $| = 1;
 
-use DBI qw(:sql_types);
-
-use ADOTEST;
+use strict;
+use warnings;
+use DBI();
+use ADOTEST();
 
 use Test::More;
 
-if (defined $ENV{DBI_DSN}) {
-	plan tests => 10;
+if ( defined $ENV{DBI_DSN} ) {
+  plan tests => 14;
 } else {
-	plan skip_all => 'Cannot test without DB info';
+  plan skip_all => 'Cannot test without DB info';
 }
+
+pass('NULL tests');
 
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
-ok ( defined $dbh, 'Connection');
+   $dbh->{RaiseError} = 1;
+   $dbh->{PrintError} = 0;
+pass('Database connection created');
 
-{
-	ok( ADOTEST::tab_create($dbh), "Create the test table $ADOTEST::table_name" );
+my $tbl = $ADOTEST::table_name;
+my @col = sort keys %ADOTEST::TestFieldInfo;
+
+ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
+
+for ( @col ) {
+  ok( $dbh->do("INSERT INTO $tbl( $_ ) VALUES( ? )", undef, undef ),"Inserting NULL into $_");
 }
 
-$dbh->{PrintError} = 1;
+my $Cols = join ', ', @col;
+my $Qs   = join ', ', map {'?'} @col;
+my $sth = $dbh->prepare("INSERT INTO $tbl( $Cols ) VALUES( $Qs )");
+ok( defined $sth,'Prepare insert statement');
 
-
-my $rslt;
-
-
-ok($rslt = $dbh->do(
-	qq{INSERT INTO $ADOTEST::table_name (A, B) VALUES (?, ?)}
-	, undef,
-	, 1, q{Testing Insert of 1} )
-, "Inserting  varchar" );
-
-ok($rslt = $dbh->do(
-	qq{INSERT INTO $ADOTEST::table_name (A, B) VALUES (?, ?)}
-	, undef,
-	, 1, undef )
-, "Inserting NULL varchar" );
-
-ok($rslt = $dbh->do(
-	qq{INSERT INTO $ADOTEST::table_name (A, B, C) VALUES (?, ?, ?)}
-	, undef,
-	, 2, q{this insert a null value}, undef )
-, "Inserting NULL date" );
-
-my $sth = $dbh->prepare(
-	qq{INSERT INTO $ADOTEST::table_name (A, B) VALUES (?, ?)});
-
-ok(defined $sth, "Prepare insert statement" );
-
-my @row;
-my $n = 7; my $s = undef;
-@row = ADOTEST::get_type_for_column($dbh, 'A');
-ok($sth->bind_param(1, $n, { TYPE => $row[0]->{DATA_TYPE}}), "Bind Param 1");
-
-@row = ADOTEST::get_type_for_column($dbh, 'B');
-ok($sth->bind_param(2, $s, { TYPE => $row[0]->{DATA_TYPE} }), "Bind Param 2");
-
-ok($sth->execute(), "Execute prepared statement with bind params");
-
+my $i = 0;
+for ( @col ) {
+  my @row = ADOTEST::get_type_for_column( $dbh, $_ );
+  ok( $sth->bind_param( ++$i, undef, { TYPE => $row[0]->{DATA_TYPE} } ),"Bind parameter for column $_");
+}
+ok( $sth->execute,'Execute prepared statement with bind params');
 
 ok( $dbh->disconnect,'Disconnect');

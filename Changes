@@ -1,3 +1,11 @@
+2004-01-11  2.84
+
+  Reimplemented NULL tests (t/23null.t).
+
+  Fixed a DBD::Proxy related bug, reported by Peter Hircock.
+  The execute() method returned a Win32::OLE::Variant object which
+  couldn't be restored at the client w/o Win32::OLE.
+
 2003-12-14  2.83
 
   Added notes about Unicode support thanks to Stefan Ram and Jan Dubois.
