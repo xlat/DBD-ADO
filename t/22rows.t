@@ -103,7 +103,7 @@ $dbh->rollback;
 ok($dbh->do( qq{drop table $from_table_name} ), "Drop table $from_table_name" );
 ok($dbh->do( qq{drop table $to_table_name} ), "Drop table $to_table_name" );
 
-ok(!$dbh->disconnect(), "Disconnect from database" );
+ok( $dbh->disconnect,'Disconnect');
 
 
 exit;

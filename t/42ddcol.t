@@ -1,17 +1,19 @@
-#!/usr/bin/perl -I./t
+#!perl -I./t
 # vim:ts=2:sw=2:ai:aw:nu
 
 $| = 1;
 
 use strict;
+use warnings;
+use DBI();
 use ADOTEST();
 
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 23;
+  plan tests => 24;
 } else {
-	plan skip_all => 'Cannot test without DB info';
+  plan skip_all => 'Cannot test without DB info';
 }
 
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
@@ -40,7 +42,8 @@ ok ( defined $dbh, 'Connection');
   {
     $i++;
     {
-      local $^W = 0; local $,  = ":"; print '-- ', @$row, "\n";
+      no warnings 'uninitialized';
+      local $,  = ":"; print '-- ', @$row, "\n";
     }
     is( $row->[ 2], $ADOTEST::table_name, "Is this table name $ADOTEST::table_name?");
     is( $row->[16], $i                  , "Is this ordinal position $i?");
@@ -51,9 +54,18 @@ ok ( defined $dbh, 'Connection');
     is( $row->[ 5] , $ti->{TYPE_NAME}   , "Is this type name $ti->{TYPE_NAME}?");
   }
 }
+# -----------------------------------------------------------------------------
+{
+my $sth;
 
-ok(!$dbh->disconnect, "Disconnect");
+# Column Info
+ eval {
+	 $sth = $dbh->column_info();
+ };
+ok ((!$@ and defined $sth), "column_info tested" );
+#ok ($@, "Call to column_info with 0 arguements, error expected: $@" );
+$sth = undef;
+}
+# -----------------------------------------------------------------------------
 
-exit;
-
-END { }
+ok( $dbh->disconnect,'Disconnect');

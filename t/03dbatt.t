@@ -1,57 +1,33 @@
-#!/usr/bin/perl -I./t
-#
+#!perl -I./t
 # vim:ts=2:sw=2:ai:aw:nu
+
 $|=1;
 
-use DBI qw(:sql_types);
-use ADOTEST;
 use strict;
+use warnings;
+use DBI();
+use ADOTEST();
 
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 25;
+  plan tests => 17;
 } else {
-	plan skip_all => 'Cannot test without DB info';
+  plan skip_all => 'Cannot test without DB info';
 }
 
-my @row;
+pass('Attribute tests');
 
-pass( "Begin testing, modules loaded" );
-
-my $dbh = DBI->connect() || die "Connect failed: $DBI::errstr\n";
-pass( "Connection established" );
-
-#### testing set/get of connection attributes
-
-my $rows = 0;
-
-ok( @row = $dbh->tables(), " tables() return a list of tables." );
-
-my $tchk = [ qw{TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS } ];
-if (my $sth = $dbh->table_info()) {
-    while (my @row = $sth->fetchrow()) {
-        $rows++;
-    }
-    $sth->finish();
-#		Check the columns returned from table_info.
-	my $vtchk = $sth->{NAME};
-	for ( 0 .. $#{$tchk} ) {
-		ok ( $tchk->[$_] eq $vtchk->[$_], "Attribute: $tchk->[$_] $vtchk->[$_] " );
-	}
-}
-ok( $rows, "Total tables count: $rows" );
-
-$rows = 0;
-# Check if type_info_all is working.
-ok( $rows = $dbh->type_info_all(), "Check type_info_all: " );
+my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
+pass('Database connection created');
 
 my $sth = $dbh->prepare("SELECT A FROM $ADOTEST::table_name");
-# $sth = $dbh->prepare("SELECT * FROM titles where title_id = ?");
-#$sth = $dbh->prepare("SELECT * FROM titles");
-#$sth->bind_param(1, undef, SQL_VARCHAR());
-#$sth->execute('PS1372');
-$sth->execute();
+$sth->execute;
+
+eval {
+  my $val = $sth->{BadAttributeHere};
+};
+ok( $@,"Statement attribute BadAttributeHere: $@");
 
 my @attribs = qw{
 	NUM_OF_FIELDS NUM_OF_PARAMS NAME NAME_lc NAME_uc
@@ -59,23 +35,17 @@ my @attribs = qw{
 	RowsInCache
 };
 
-eval {
-	my $val = $sth->{BadAttributeHere};
-};
-ok( $@, " Statement attribute: BadAttributeHere" );
-
-foreach my $attrib (sort @attribs) {
-	eval {
-		my $val = $sth->{$attrib};
-	};
-	ok( !$@, " Statement attribute: $attrib" );
+for my $attrib ( sort @attribs ) {
+  eval {
+    my $val = $sth->{$attrib};
+  };
+  ok( !$@,"Statement attribute: $attrib");
 }
 
 my $val = -1;
-ok($val = ($sth->{RowsInCache} = 100) , " Setting RowsInCache : $val" );
-ok(($val = $sth->{RowsInCache}) == 100, " Getting RowsInCache : $val" );
+ok(  $val = ( $sth->{RowsInCache}    = 100 ),"Setting RowsInCache : $val");
+ok( ($val =   $sth->{RowsInCache} ) == 100  ,"Getting RowsInCache : $val");
 
 $sth->finish;
 
-
-ok( !$dbh->disconnect(), "Disconnect, tests completed" );
+ok( $dbh->disconnect,'Disconnect');

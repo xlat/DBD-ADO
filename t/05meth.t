@@ -9,7 +9,7 @@ use DBI();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 6;
+  plan tests => 7;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -85,4 +85,4 @@ is( $Ok, 1, 'All fields defined');
 # turn off error warnings.  We expect one here (invalid transaction state)
 $dbh->{RaiseError} = 0;
 $dbh->{PrintError} = 0;
-$dbh->disconnect;
+ok( $dbh->disconnect,'Disconnect');

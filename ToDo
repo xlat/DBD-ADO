@@ -3,11 +3,6 @@ Adjust return codes wrt the spec
 
 Improve bind_param for types other than Varchar, add more tests.
 
-Fix the warning 'Use of uninitialized value in hash element at
-DBI.pm line 1799'.
-
-Missing first row after reexecute?
-
 Reimplement the t/23warn.t tests.
 
 Mon  Apr 8, 2002  23:06:36

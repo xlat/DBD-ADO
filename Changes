@@ -1,3 +1,17 @@
+2003-11-02  2.77
+
+  Added DBD::ADO::Const.
+
+  Moved metadata tests into t/4?dd*.t.
+
+  Fixed significant bug (missing first row after reexecute) and
+  added t/12count.t to test row counts.
+
+  Fixed return code of commit(), rollback() and disconnect().
+
+  Fixed warning 'Use of uninitialized value in hash element' at
+  DBI.pm line 1799.
+
 2003-10-26  2.76
 
   Dropped auto-commit emulation (relying on ADO's default behavior

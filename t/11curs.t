@@ -172,7 +172,7 @@ $sth1 = undef;
 
 ok( $dbh->do( qq{drop table $ADOTEST::table_name} ) , " Drop test table" );
 
-ok( !$dbh->disconnect, q{Disconnect} );
+ok( $dbh->disconnect,'Disconnect');
 
 exit(0);
 

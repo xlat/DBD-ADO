@@ -45,7 +45,7 @@ foreach my $type (@$chck) {
 
 }
 
-ok(!$dbh->disconnect(), "Disconnect from database" );
+ok( $dbh->disconnect,'Disconnect');
 
 $dbh = DBI->connect() or die "Connect failed: $DBI::errstr\n";
 pass( "Database connection created." );
@@ -84,4 +84,4 @@ my $types = $dbh->type_info_all();
 
 # print Dumper($types), "\n";
 
-ok(!$dbh->disconnect(), "Disconnect from database" );
+ok( $dbh->disconnect,'Disconnect');

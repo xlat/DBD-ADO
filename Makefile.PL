@@ -8,7 +8,7 @@ BEGIN { require 5.004 }  # 5.004 is required for Win32
 use Config;
 use ExtUtils::MakeMaker 5.16, qw(&WriteMakefile $Verbose);
 use Getopt::Long;
-use DBI 0.93;  # must be installed first
+use DBI 1.20;  # must be installed first
 use DBI::DBD;
 use strict;
 
@@ -27,7 +27,7 @@ my %opts =
 if ( $ExtUtils::MakeMaker::VERSION >= 5.43 ) {
   $opts{AUTHOR} = 'Tim Bunce, Phlip, Thomas Lowery and Steffen Goeldner ( http://dbi.perl.org )';
   $opts{ABSTRACT} = 'ADO driver for the DBI module.';
-  $opts{PREREQ_PM} = { DBI => 0 };
+  $opts{PREREQ_PM} = { DBI => 0, Win32::OLE => 0.16 };
   $opts{CAPI} = 'TRUE' if $Config{archname} =~ /-object\b/i;
 }
 

@@ -9,7 +9,7 @@ use DBI();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 8;
+  plan tests => 9;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -51,7 +51,7 @@ eval {
     printf " %6d %-35s %-13s %s\n", $Nr, $_, $Str, $Exp;
   }
 };
-$dbh->disconnect;
+ok( $dbh->disconnect,'Disconnect');
 
 __END__
 

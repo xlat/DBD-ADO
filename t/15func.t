@@ -1,107 +1,63 @@
-#!/usr/bin/perl -I./t
-$| = 1;
-
+#!perl -I./t
 # vim:ts=2:sw=2:ai:aw:nu:
-use DBI qw(:sql_types);
-use ADOTEST;
-use Data::Dumper;
+
+$| = 1;
 
 use strict;
 use warnings;
-
-my ($pf, $sf);
+use DBI ();
+use ADOTEST();
 
 use Test::More;
+
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 42;
+  plan tests => 16;
 } else {
-	plan skip_all => 'Cannot test without DB info';
+  plan skip_all => 'Cannot test without DB info';
 }
 
-my $non_supported = '-2146825037';
+my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
+ok ( defined $dbh,'Connection');
 
-my $dbh = DBI->connect() or die "Connect failed: $DBI::errstr\n";
-ok ( defined $dbh, "Connection" ); # print "ok 2\n";
-
-
-#
 # Test the different methods, so are expected to fail.
-#
+
+# XXX
 
 my $sth;
 
-# foreach (@{ $DBI::EXPORT_TAGS{sql_types} }) {
-# 	no strict 'refs';
-# 	printf "%s=%d\n", $_, &{"DBI::$_"};
-# }
+eval {
+  ok( $dbh->ping,'Testing Ping');
+};
+ok ( !$@,'Ping Tested');
 
-# Ping
- eval {
-	 ok( $dbh->ping(), "Testing Ping" );
- };
-ok ( !$@, "Ping Tested" );
-
-# Table Info
- eval {
-	 $sth = $dbh->table_info();
- };
-ok ((!$@ and defined $sth), "table_info tested" );
+eval {
+  $sth = $dbh->type_info_all;
+};
+ok ( ( !$@ and defined $sth ),'type_info_all tested');
 $sth = undef;
 
-# Column Info
- eval {
-	 $sth = $dbh->column_info();
- };
-ok ((!$@ and defined $sth), "column_info tested" );
-#ok ($@, "Call to column_info with 0 arguements, error expected: $@" );
+eval {
+  my @types = $dbh->type_info;
+  die unless @types;
+};
+ok ( !$@,'type_info( undef )');
 $sth = undef;
 
-
-# Tables
- eval {
-	 $sth = $dbh->tables();
- };
-ok ((!$@ and defined $sth), "tables tested" );
-$sth = undef;
-
-# Type Info All
- eval {
-	 $sth = $dbh->type_info_all();
- };
-ok ((!$@ and defined $sth), "type_info_all tested" );
-$sth = undef;
-
-# Type Info
- eval {
-	 my @types = $dbh->type_info();
-	die unless @types;
- };
-ok (!$@, "type_info(undef)");
-$sth = undef;
-
-# Quote
-eval { $dbh->quote() };
-
-
-
+eval {
+  $dbh->quote
+};
 ok( $@,"Call to quote() with 0 arguments, error expected: $@ ");
 
-# Tests for quote:
-my @qt_vals = (1, 2, undef, 'NULL', "ThisIsAString", "This is Another String");
-my @expt_vals = (q{'1'}, q{'2'}, "NULL", q{'NULL'}, q{'ThisIsAString'}, q{'This is Another String'});
-for (my $x = 0; $x <= $#qt_vals; $x++) {
+my @qt_vals   = (   1  ,    2  , undef ,   'NULL' ,   'ThisIsAString',    'This is Another String' );
+my @expt_vals = (q{'1'}, q{'2'}, 'NULL', q{'NULL'}, q{'ThisIsAString'}, q{'This is Another String'});
+for ( my $x = 0; $x <= $#qt_vals; $x++ ) {
   my $val1 = defined $qt_vals[$x] ? $qt_vals[$x] : 'undef';
   my $val = $dbh->quote( $qt_vals[$x] );
   is( $val, $expt_vals[$x],"$x: quote on $val1 returned $val");
 }
+is( $dbh->quote( 1, DBI::SQL_INTEGER() ), 1,'quote( 1, SQL_INTEGER )');
 
-is( $dbh->quote( 1, SQL_INTEGER() ), 1, "quote(1, SQL_INTEGER)" );
-
-
-# Quote Identifier
-eval { $dbh->quote_identifier() };
-
-
+eval { $dbh->quote_identifier };
 
 ok( $@,"Call to quote_identifier() with 0 arguments, error expected: $@ ");
 
@@ -110,128 +66,8 @@ my $sep = $dbh->get_info( 41 );  # SQL_CATALOG_NAME_SEPARATOR
 
 my $cmp_str = qq{${qt}link${qt}${sep}${qt}schema${qt}${sep}${qt}table${qt}};
 is( $dbh->quote_identifier( "link", "schema", "table" )
-	, $cmp_str
-	, q{quote_identifier( "link", "schema", "table" )}
+  , $cmp_str
+  , q{quote_identifier( "link", "schema", "table" )}
 );
 
-# Test ping
-
-ok ($dbh->ping, "Ping the current connection ..." );
-
-# Test Table Info
-$sth = $dbh->table_info( undef, undef, undef );
-ok( defined $sth, "table_info(undef, undef, undef) tested" );
-DBI::dump_results($sth) if defined $sth;
-$sth = undef;
-
-$sth = $dbh->table_info( undef, undef, undef, "VIEW" );
-ok( defined $sth, "table_info(undef, undef, undef, \"VIEW\") tested" );
-DBI::dump_results($sth) if defined $sth;
-$sth = undef;
-
-# Test Table Info Rule 19a
-$sth = $dbh->table_info( '%', '', '');
-ok( defined $sth, "table_info('%', '', '',) tested" );
-DBI::dump_results($sth) if defined $sth;
-$sth = undef;
-
-# Test Table Info Rule 19b
-$sth = $dbh->table_info( '', '%', '');
-ok( defined $sth, "table_info('', '%', '',) tested" );
-DBI::dump_results($sth) if defined $sth;
-$sth = undef;
-
-# Test Table Info Rule 19c
-$sth = $dbh->table_info( '', '', '', '%');
-ok( defined $sth, "table_info('', '', '', '%',) tested" );
-DBI::dump_results($sth) if defined $sth;
-$sth = undef;
-
-# Test to see if this database contains any of the defined table types.
-$sth = $dbh->table_info( '', '', '', '%');
-ok( defined $sth, "table_info('', '', '', '%',) tested" );
-if ($sth) {
-	my $ref = $sth->fetchall_hashref( 'TABLE_TYPE' );
-	foreach my $type ( sort keys %$ref ) {
-		my $tsth = $dbh->table_info( undef, undef, undef, $type );
-		ok( defined $tsth, "table_info(undef, undef, undef, $type) tested" );
-		DBI::dump_results($tsth) if defined $tsth;
-		$tsth->finish;
-	}
-	$sth->finish;
-}
-$sth = undef;
-
-# Test Column Info
-# Test moved to 23ddcol.t
-# $sth = $dbh->column_info( undef, undef, undef, undef );
-# ok( defined $sth, "column_info(undef, undef, undef, undef) tested" );
-# DBI::dump_results($sth) if defined $sth;
-# $sth = undef;
-
-SKIP: {
-	# Test call to primary_key_info
-	local ($dbh->{Warn}, $dbh->{PrintError});
-	$dbh->{PrintError} = $dbh->{Warn} = 0;
-
-	# Primary Key Info
-	eval {
-		$sth = $dbh->primary_key_info();
-		die unless $sth;
-	};
-	ok ($@, "Call to primary_key_info with 0 arguements, error expected: $@" );
-	$sth = undef;
-
-	# Primary Key
-	eval {
-		$sth = $dbh->primary_key();
-		die unless $sth;
-	};
-	ok ($@, "Call to primary_key with 0 arguements, error expected: $@" );
-	$sth = undef;
-
-	$sth = $dbh->primary_key_info(undef, undef, undef );
-
-	skip 'primary_key_info not supported by provider', 5 if $dbh->err && $dbh->err == $non_supported;
-
-	ok( defined $dbh->err, "Call dbh->primary_key_info() ... " );
-	ok( defined $sth, "Statement handle defined for primary_key_info()" );
-
-  $sth->dump_results if defined $sth;
-  undef $sth;
-
-	$sth = $dbh->primary_key_info(undef, undef, undef );
-	ok( defined $dbh->err, "Call dbh->primary_key_info() ... " .
-		($dbh->err? $dbh->errstr : 'no error message' ));
-	ok( defined $sth, "Statement handle defined for primary_key_info()" );
-
-	my ( %catalogs, %schemas, %tables);
-
-	my $cnt = 0;
-	while( my ($catalog, $schema, $table) = $sth->fetchrow_array ) {
-		$catalogs{$catalog}++	if $catalog;
-		$schemas{$schema}++		if $schema;
-		$tables{$table}++			if $table;
-		$cnt++;
-	}
-	ok( $cnt > 0, "At least one table has a primary key." );
-
-}
-
-undef $sth;
-
-SKIP: {
-	# foreign_key_info
-	local ($dbh->{Warn}, $dbh->{PrintError});
-	$dbh->{PrintError} = $dbh->{Warn} = 0;
-	$sth = $dbh->foreign_key_info();
-	skip 'foreign_key_info not supported by provider', 1 if $dbh->err && $dbh->err == $non_supported;
-	ok( defined $sth, "Statement handle defined for foreign_key_info()" );
-	DBI::dump_results($sth) if defined $sth;
-	$sth = undef;
-}
-
-ok( !$dbh->disconnect, "Disconnect from database" );
-
-exit(0);
-
+ok( $dbh->disconnect,'Disconnect');

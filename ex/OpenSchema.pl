@@ -1,5 +1,5 @@
 use DBI();
-use DBD::ADO::TypeInfo();
+use DBD::ADO::Const();
 
 $\ = "\n";
 $, = " | ";
@@ -14,12 +14,12 @@ unless ( $QueryType )
 {
   print "Usage: $0 [QueryType] [Criteria]\n";
   print '  QueryTypes:';
-  print "    $_" for sort keys %{DBD::ADO::TypeInfo->Enums->{SchemaEnum}};
+  print "    $_" for sort keys %{DBD::ADO::Const->Enums->{SchemaEnum}};
   exit;
 }
 my $dbh = DBI->connect or die $DBI::errstr;
    $dbh->{RaiseError} = 1;
-   $dbh->{PrintError} = 1;
+   $dbh->{PrintError} = 0;
 
 my $sth = $dbh->func( $QueryType, @Criteria, 'OpenSchema')
   or die "Statement returned undef" unless $sth;

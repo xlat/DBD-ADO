@@ -7,9 +7,9 @@
   require DBI;
   require Carp;
   use strict;
-  use vars qw($err $errstr $state $drh $VERSION);
+  use vars qw($VERSION  $drh $err $errstr $state);
 
-  $VERSION = '2.76';
+  $VERSION = '2.77';
 
 # Copyright (c) 1998, Tim Bunce
 # Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
@@ -21,25 +21,25 @@
 # You may distribute under the terms of either the GNU General Public
 # License or the Artistic License, as specified in the Perl README file.
 
-  $drh = undef;       # holds driver handle once initialised
-  $err = 0;           # The $DBI::err value
-  $errstr = "";
-  $state = "";
+  $drh    = undef;  # holds driver handle once initialised
+  $err    = 0;      # The $DBI::err value
+  $errstr = '';
+  $state  = '';
 
-    sub driver{
-        return $drh if $drh;
-        my($class, $attr) = @_;
-        $class .= "::dr";
-        ($drh) = DBI::_new_drh($class, {
-            'Name' 				=> 'ADO',
-            'Version' 		=> $VERSION,
-            'Attribution' => 'DBD ADO for Win32 by Tim Bunce, Phlip, Thomas Lowery and Steffen Goeldner',
-						'Err' 				=> \$DBD::ADO::err,
-						'Errstr' 			=> \$DBD::ADO::errstr,
-						'State' 			=> \$DBD::ADO::state,
-	});
-        return $drh;
-    }
+  sub driver {
+    return $drh if $drh;
+    my($class, $attr) = @_;
+    $class .= "::dr";
+    ($drh) = DBI::_new_drh( $class, {
+      'Name' 				=> 'ADO',
+      'Version' 		=> $VERSION,
+      'Attribution' => 'DBD ADO for Win32 by Tim Bunce, Phlip, Thomas Lowery and Steffen Goeldner',
+			'Err' 				=> \$DBD::ADO::err,
+			'Errstr' 			=> \$DBD::ADO::errstr,
+			'State' 			=> \$DBD::ADO::state,
+    });
+    return $drh;
+  }
 
   sub errors {
     my $Conn = shift;
@@ -73,14 +73,9 @@
 
 }
 
-# ADO.pm lexically scoped constants
-#my $ado_consts;
 my $VT_I4_BYREF;
-#my $ado_sptype;
-my %connect_options;
 
-
-{   package DBD::ADO::dr; # ====== DRIVER ======
+{ package DBD::ADO::dr; # ====== DRIVER ======
 
 	use strict;
 	use vars qw($imp_data_size);
@@ -89,7 +84,6 @@ my %connect_options;
 	require Win32::OLE::Const;
 	require Win32::OLE::Variant;
 	$imp_data_size = 0;
-
 
 	use constant DBPROPVAL_TC_ALL					=> 8;
 	use constant DBPROPVAL_TC_DDL_IGNORE	=> 4;
@@ -391,6 +385,7 @@ my @sql_types_supported = ();
 						"Failed to Rollback Trans: $lastError")
 					if $lastError;
 			}
+      return 1;
 		}
 
 		sub disconnect {
@@ -428,7 +423,8 @@ my @sql_types_supported = ();
 			}
 
 			$dbh->{ado_conn} = undef if defined $dbh->{ado_conn};
-			return;
+      $dbh->SUPER::STORE('Active' => 0 );
+      return 1;
 		}
 
 		# Commit to the database.
@@ -458,6 +454,7 @@ my @sql_types_supported = ();
 				return $dbh->set_err( $DBD::ADO::err || -1, "Failed to CommitTrans: $lastError")
 					if $lastError;
 			}
+      return 1;
 		}
 
 		# The create parm methods builds a usable type statement for constructing
@@ -520,18 +517,18 @@ my @sql_types_supported = ();
 						,CursorName		=> undef
 						,RowsInCache	=> 0
 						,ado_type			=> undef
-						,rows					=> undef
 				}, {
 						 ado_comm			=> $comm
 						,ado_attribs	=> $attribs
 						,ado_commandtimeout => undef
 						,ado_conn 		=> $conn
-						,ado_current_row_count => 0
 						,ado_cursortype => undef
 						,ado_dbh			=> $dbh
 						,ado_fields		=> undef
 						,ado_params		=> []
 						,ado_refresh	=> 1
+						,ado_rownum		=> -1
+						,ado_rows			=> -1
 						,ado_rowset		=> undef
 						,ado_usecmd		=> undef
 						,ado_users		=> undef
@@ -548,11 +545,12 @@ my @sql_types_supported = ();
 
 			$sth->{ado_comm}		= $comm;
 			$sth->{ado_conn}		= $conn;
-			$sth->{ado_current_row_count} = 0;
 			$sth->{ado_dbh}			= $dbh;
 			$sth->{ado_fields}	= undef;
 			$sth->{ado_params}	= [];
 			$sth->{ado_refresh}	= 1;
+			$sth->{ado_rownum}	= -1;
+			$sth->{ado_rows}		= -1;
 			$sth->{ado_rowset}	= undef;
 			$sth->{ado_attribs}	= $attribs;
 			$sth->{ado_usecmd}	= undef;
@@ -650,21 +648,23 @@ my @sql_types_supported = ();
 					 ado_attribs	=> $attribs
 					,ado_comm			=> $conn
 					,ado_conn 		=> $conn
-					,ado_current_row_count => 0
 					,ado_dbh			=> $dbh
 					,ado_fields		=> $ado_fields
 					,ado_params		=> []
 					,ado_refresh	=> 0
+					,ado_rownum		=> -1
+					,ado_rows			=> -1
 					,ado_rowset		=> $rs
 			});
 
 			$sth->{ado_comm}		= $conn;
 			$sth->{ado_conn}		= $conn;
-			$sth->{ado_current_row_count} = 0;
 			$sth->{ado_dbh}			= $dbh;
 			$sth->{ado_fields}	= $ado_fields;
 			$sth->{ado_params}	= [];
 			$sth->{ado_refresh}	= 0;
+			$sth->{ado_rownum}	= -1;
+			$sth->{ado_rows}		= -1;
 			$sth->{ado_rowset}	= $rs;
 			$sth->{ado_attribs}	= $attribs;
 
@@ -772,9 +772,13 @@ my @sql_types_supported = ();
 				$dbh->trace_msg( "->	Rule 19a, record set undefined\n" );
 				my $csth = $dbh->table_info( { Trim_Catalog => 1 } );
 				if ($csth) {
-					my $ref = $csth->fetchall_hashref( 'TABLE_CAT' );
-					push @tp, [ map { $_, undef, undef, undef, undef } sort keys %$ref ];
-					$csth->finish;
+          my $ref = {};
+          my $Undef = 0;  # for 'undef' hash keys (which mutate to '')
+          while ( my $Row = $csth->fetch ) {
+            defined $Row->[0] ? $ref->{$Row->[0]} = 1 : $Undef = 1;
+          }
+          push @tp, [ undef, undef, undef, undef, undef ] if $Undef;
+          push @tp, [    $_, undef, undef, undef, undef ] for sort keys %$ref;
 				}
 				else {
 					push @tp, [ undef, undef, undef, undef, undef ];
@@ -812,9 +816,13 @@ my @sql_types_supported = ();
 				$dbh->trace_msg( "->	Rule 19b, record set undefined\n" );
 				my $csth = $dbh->table_info( { Trim_Catalog => 1 } );
 				if ($csth) {
-					my $ref = $csth->fetchall_hashref( 'TABLE_SCHEM' );
-					push @tp, [ map { undef, $_, undef, undef, undef } sort keys %$ref ];
-					$csth->finish;
+          my $ref = {};
+          my $Undef = 0;  # for 'undef' hash keys (which mutate to '')
+          while ( my $Row = $csth->fetch ) {
+            defined $Row->[0] ? $ref->{$Row->[0]} = 1 : $Undef = 1;
+          }
+          push @tp, [ undef, undef, undef, undef, undef ] if $Undef;
+          push @tp, [ undef,    $_, undef, undef, undef ] for sort keys %$ref;
 				}
 				else {
 					push @tp, [ undef, undef, undef, undef, undef ];
@@ -1855,7 +1863,7 @@ my @sql_types_supported = ();
 
 					# Determine the effected row count?
 					my $c = ($rows->Value == 0 ? qq{0E0} : $rows->Value);
-					$sth->STORE('rows', $c);
+					$sth->{ado_rows} = $rows;
 					$sth->trace_msg("<- executed state handler (no recordset)\n");
 					# Clean up the record set that isn't used.
 					if (defined $rs and (ref $rs) =~ /Win32::OLE/) {
@@ -1913,18 +1921,21 @@ my @sql_types_supported = ();
 		$sth->STORE( CursorName		=> undef);
 		$sth->STORE( Statement		=> $rs->Source);
 		$sth->STORE( RowsInCache	=> $rs->CacheSize);
-		$sth->STORE( rows					=> $rs->RecordCount );
+
+		$sth->{ado_rownum} = 0;
+		$sth->{ado_rows} = $rows;  # $rs->RecordCount
 
 		# We need to return a true value for a successful select
 		# -1 means total row count unavailable
 		$sth->trace_msg("<- executed state handler\n");
-		return $rs->RecordCount;
+
+		return $rows || '0E0';  # $rs->RecordCount
     }
 
 		sub rows {
 			my ($sth) = @_;
 			return unless defined $sth;
-			my $rc = $sth->FETCH( 'rows' );
+			my $rc = $sth->{ado_rows};
 			return defined $rc ? $rc : -1;
 		}
 
@@ -1945,7 +1956,7 @@ my @sql_types_supported = ();
 			# required to not move from the current row
 			# until the next fetch is called.  blob_read
 			# reads the next record without this check.
-			if ($sth->{ado_current_row_count} > 0) {
+			if ($sth->{ado_rownum} > 0) {
 				$rs->MoveNext;	# to check for errors and record for next itteration
 			}
 			return undef if $rs->{EOF};
@@ -1991,10 +2002,9 @@ my @sql_types_supported = ();
 					print "\n";
 				}
 			}
-
-
-		$sth->{ado_current_row_count}++;
-		return $sth->_set_fbav($row);
+			$sth->{ado_rownum}++;
+			$sth->{ado_rows} = $sth->{ado_rownum};
+			return $sth->_set_fbav($row);
     }
     *fetch = \&fetchrow_arrayref;
 

@@ -153,7 +153,7 @@ foreach my $ric (qw[1 10 100 1000]) {
 $sel = undef;
 
 ok($dbh->do( qq{drop table $table_name} ), "Drop table $table_name" );
-ok(!$dbh->disconnect(), "Disconnect from database" );
+ok( $dbh->disconnect,'Disconnect');
 
 
 exit;

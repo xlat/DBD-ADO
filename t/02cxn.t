@@ -36,5 +36,8 @@ print "\n  Connection Properties Collection:\n";
 printf "    %-45s %s\n", $_->Name, $_->Value ||'undef'
   for sort { $a->Name cmp $b->Name } Win32::OLE::in( $Properties );
 
-$dbh->disconnect;
-pass('disconnect');
+# XXX: ok( $dbh->{Active},'Active');
+ok( $dbh->disconnect,'Disconnect');
+# XXX: ok(!$dbh->{Active},'Active');
+#Connection open, destroy at t\02cxn.t line 0
+#        (in cleanup) Can't call method "State" on unblessed reference at F:/tmp/DBD-ADO-2.77/blib/lib/DBD/ADO.pm line 1549.

@@ -16,7 +16,7 @@ use DBI();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 2;
+	plan tests => 3;
 } else {
 	plan skip_all => 'Cannot test without DB info';
 }
@@ -36,4 +36,4 @@ pass('Database connection created');
 #$sth->execute;
 #$sth->dump_results;
 
-$dbh->disconnect;
+ok( $dbh->disconnect,'Disconnect');

@@ -138,7 +138,7 @@ ok( defined $sth1,'Prepared statement * and Parameter');
   ok( defined $@,"RaiseError caught error:\n$@");
 }
 
-ok( !$dbh->disconnect,'Disconnect');
+ok( $dbh->disconnect,'Disconnect');
 
 exit( 0 );
 

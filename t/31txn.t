@@ -10,7 +10,7 @@ use ADOTEST();
 use Test::More;
 
 if ( defined $ENV{DBI_DSN} ) {
-  plan tests => 18;
+  plan tests => 19;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -47,18 +47,16 @@ ok( $dbh->{AutoCommit}, "AutoCommit ON: $dbh->{AutoCommit}");
 
 is( commitTest( $dbh ), 1,'Commit Test, AutoCommit ON');
 
-ok( $dbh->begin_work, 'begin_work');
-ok( $dbh->{BegunWork}, 'BegunWork ON');
-ok( !$dbh->{AutoCommit}, 'AutoCommit OFF');
-$dbh->rollback;  # XXX: ok( $dbh->rollback, 'rollback');
-ok( !$dbh->{BegunWork}, 'BegunWork OFF');
-ok( $dbh->{AutoCommit}, 'AutoCommit ON');
+ok( $dbh->begin_work  ,'begin_work');
+ok( $dbh->{BegunWork} ,'BegunWork ON');
+ok(!$dbh->{AutoCommit},'AutoCommit OFF');
+ok( $dbh->rollback    ,'rollback');
+ok(!$dbh->{BegunWork} ,'BegunWork OFF');
+ok( $dbh->{AutoCommit},'AutoCommit ON');
 
-$dbh->do("DROP TABLE $ADOTEST::table_name");
-pass("DROP TABLE $ADOTEST::table_name");
+ok( $dbh->do("DROP TABLE $ADOTEST::table_name"),"DROP TABLE $ADOTEST::table_name");
 
-$dbh->disconnect;
-pass('disconnect');
+ok( $dbh->disconnect,'Disconnect');
 
 # -----------------------------------------------------------------------------
 # Returns true when a row remains inserted after a rollback.
