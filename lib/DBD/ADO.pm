@@ -10,10 +10,10 @@
 		use vars qw($err $errstr $state $drh $VERSION @EXPORT);
 
     @EXPORT = ();
-    $VERSION = (qw$Revision: 2.5 $)[1];
+    $VERSION = (qw$Revision: 2.6 $)[1];
 
 
-#   $Id: ADO.pm,v 2.5 2002/04/14 04:17:20 talowery Exp $
+#   $Id: ADO.pm,v 2.6 2002/11/09 21:08:44 talowery Exp $
 #
 #   Copyright (c) 1999, Phlip & Tim Bunce
 #   Copyright (c) 2000, Phlip   Tim Bunce, and Thomas Lowery
@@ -606,6 +606,7 @@ my @sql_types_supported = ();
 						,CursorName		=> undef
 						,RowsInCache	=> 0
 						,ado_type			=> undef
+						,rows					=> undef
 				}, {
 						 ado_comm			=> $comm
 						,ado_attribs	=> $attribs
@@ -1980,6 +1981,7 @@ my @sql_types_supported = ();
 			my $num_of_fields = @$ado_fields;
 
 			if ($num_of_fields == 0) {	# assume non-select statement
+
 					# If the AutoCommit is on, Commit current transaction.
 					$conn->CommitTrans 
 						if $sth->{ado_dbh}->{AutoCommit} 
@@ -1987,9 +1989,10 @@ my @sql_types_supported = ();
 					$lastError = DBD::ADO::errors($conn);
 					return DBI::set_err( $sth, $DBD::ADO::err, 
 							"Execute: Commit failed: $lastError")
-					if $lastError;
+						if $lastError;
 
 
+					# Determine the effected row count?
 					my $c = ($rows->Value == 0 ? qq{0E0} : $rows->Value);
 					$sth->STORE('rows', $c);
 					$sth->trace_msg("<- executed state handler (no recordset)\n");
@@ -2057,7 +2060,12 @@ my @sql_types_supported = ();
 		return $rs->RecordCount;
     }
 
-
+		sub rows {
+			my ($sth) = @_;
+			return unless defined $sth;
+			my $rc = $sth->FETCH( 'rows' );
+			return defined $rc ? $rc : -1;
+		}
 
     sub fetchrow_arrayref {
 			my ($sth) = @_;
