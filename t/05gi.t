@@ -14,7 +14,7 @@ if (defined $ENV{DBI_DSN}) {
   plan skip_all => 'Cannot test without DB info';
 }
 
-pass('Beginning test, modules loaded');
+pass('Get info tests');
 
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
@@ -30,9 +30,9 @@ my $get_info = {
 , SQL_CATALOG_LOCATION       => 114
 };
 
-for my $info ( sort keys %$get_info ) {
-  my $type =  $dbh->get_info( $get_info->{$info} );
-  ok( defined $type,"get_info( $get_info->{$info} ) ($info): $type");
+for ( sort keys %$get_info ) {
+  my $info =  $dbh->get_info( $get_info->{$_} );
+  ok( defined $info,"get_info( $get_info->{$_} ) ($_): $info");
 }
 
 eval {

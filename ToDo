@@ -1,8 +1,6 @@
 
 Adjust return codes wrt the spec
 
-Change tests to use bind_param() more often.
-
 
 ParamValues: What's the reason for the following problem?
 

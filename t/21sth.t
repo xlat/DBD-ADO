@@ -1,7 +1,6 @@
 #!perl -I./t
-# vim:ts=2:sw=2:ai:aw:nu
 
-$|=1;
+$| = 1;
 
 use strict;
 use warnings;
@@ -21,7 +20,9 @@ pass('Attribute tests');
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
-my $sth = $dbh->prepare("SELECT A FROM $ADOTEST::table_name");
+my $tbl = $ADOTEST::table_name;
+
+my $sth = $dbh->prepare("SELECT A FROM $tbl");
 $sth->execute;
 
 # TODO:
@@ -33,17 +34,24 @@ $sth->execute;
 #};
 #ok( $@,"Statement attribute BadAttributeHere: $@");
 
-my @attribs = qw{
-	NUM_OF_FIELDS NUM_OF_PARAMS NAME NAME_lc NAME_uc
-	PRECISION SCALE NULLABLE CursorName Statement
-	RowsInCache
-};
+my @attribs = qw(
+NUM_OF_FIELDS
+NUM_OF_PARAMS
+NAME NAME_lc
+NAME_uc
+PRECISION
+SCALE
+NULLABLE
+CursorName
+Statement
+RowsInCache
+);
 
 for my $attrib ( sort @attribs ) {
   eval {
     my $val = $sth->{$attrib};
   };
-  ok( !$@,"Statement attribute: $attrib");
+  ok(!$@,"Statement attribute: $attrib");
 }
 
 my $val = -1;

@@ -10,13 +10,15 @@ use ADOTEST();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 13;
+  plan tests => 16;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
 
+pass('Primary key tests');
+
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
-ok ( defined $dbh,'Connection');
+pass('Database connection created');
 
 eval { $dbh->primary_key_info };
 ok( $@,"Call to primary_key_info with 0 arguments, error expected: $@");
@@ -24,9 +26,23 @@ ok( $@,"Call to primary_key_info with 0 arguments, error expected: $@");
 eval { $dbh->primary_key };
 ok( $@,"Call to primary_key with 0 arguments, error expected: $@");
 
+{
+  local $dbh->{Warn} = 0;
+  local $dbh->{PrintError} = 0;
+
+  my $sth = $dbh->primary_key_info( undef, undef, undef );
+}
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+SKIP: {
+  my $non_supported = '-2146825037';
+  skip('primary_key_info not supported by provider', 11 )
+    if $dbh->err && $dbh->err == $non_supported;
+
+
 my $catalog = undef;  # TODO: current catalog?
 my $schema  = undef;  # TODO: current schema?
-my $table   = $ADOTEST::table_name;
+my $tbl     = $ADOTEST::table_name;
 
 my $ti = ADOTEST::get_type_for_column( $dbh,'A');
 is( ref $ti,'HASH','Type info');
@@ -34,74 +50,65 @@ is( ref $ti,'HASH','Type info');
 {
   local ($dbh->{Warn}, $dbh->{PrintError});
   $dbh->{PrintError} = $dbh->{Warn} = 0;
-  $dbh->do("DROP TABLE $table");
+  $dbh->do("DROP TABLE $tbl");
 }
+# -----------------------------------------------------------------------------
+{
+  my $sql = <<"SQL";
+CREATE TABLE $tbl
+(
+  K1 $ti->{TYPE_NAME} PRIMARY KEY
+, K2 $ti->{TYPE_NAME}
+)
+SQL
+  $dbh->do( $sql );
+  is( $dbh->err, undef,"$sql");
 
-my $sql = <<"SQL";
-CREATE TABLE $table
+  my $sth = $dbh->primary_key_info( $catalog, $schema, $tbl );
+  ok( defined $sth,'Statement handle defined');
+
+  my $a = $sth->fetchall_arrayref;
+
+  print "# Primary key columns:\n";
+  print '# ', DBI::neat_list( $_ ), "\n" for @$a;
+
+  is( $#$a, 0,'Exactly one primary key column');
+  is( uc( $a->[0][3] ),'K1', 'Primary key column name');
+
+  ok( $dbh->do( $_ ), $_ ) for "DROP TABLE $tbl";
+}
+# -----------------------------------------------------------------------------
+SKIP: {
+  my $sql = <<"SQL";
+CREATE TABLE $tbl
 (
   K1 $ti->{TYPE_NAME}
 , K2 $ti->{TYPE_NAME}
 , PRIMARY KEY ( K1, K2 )
 )
 SQL
-print $sql;
+  {
+    local $dbh->{PrintError} = 0;
+    $dbh->do( $sql );
+  }
+  is( $dbh->err, undef,"$sql");
 
-ok( $dbh->do( $sql ),'Create table');
+  skip('PK test', 4 ) if $dbh->err;
 
-{
-  my $sth = $dbh->primary_key_info( $catalog, $schema, $table );
+  my $sth = $dbh->primary_key_info( $catalog, $schema, $tbl );
   ok( defined $sth,'Statement handle defined');
 
+  my $a = $sth->fetchall_arrayref;
+
   print "# Primary key columns:\n";
-  my @cols;
-  while ( my $row = $sth->fetch )
-  {
-    no warnings 'uninitialized';
-    local $,  = "\t";
-    print '# ', @$row, "\n";
-    push @cols, $row->[3];
-  }
-  is( @cols, 2,'Primary key columns');
-  for ( 1, 2 )
-  {
-    is( $cols[$_-1],'K' . $_, 'Primary key column names');
-  }
+  print '# ', DBI::neat_list( $_ ), "\n" for @$a;
+
+  is( $#$a, 1,'Exactly two primary key columns');
+  is( uc( $a->[$_-1][3] ),"K$_","Primary key column name: K$_") for 1, 2;
 }
 # -----------------------------------------------------------------------------
-SKIP: {
-  my $sth;
-
-  local $dbh->{Warn} = 0;
-  local $dbh->{PrintError} = 0;
-
-  $sth = $dbh->primary_key_info( undef, undef, undef );
-
-  my $non_supported = '-2146825037';
-
-  skip 'primary_key_info not supported by provider', 3
-    if $dbh->err && $dbh->err == $non_supported;
-
-  ok( defined $sth,'Statement handle defined for primary_key_info()');
-
-  $sth->dump_results if defined $sth;
-  undef $sth;
-
-  $sth = $dbh->primary_key_info( undef, undef, undef );
-
-  ok( defined $sth,'Statement handle defined for primary_key_info()');
-
-  my ( %catalogs, %schemas, %tables );
-
-  my $cnt = 0;
-  while ( my ( $catalog, $schema, $table ) = $sth->fetchrow_array ) {
-    $catalogs{$catalog}++ if $catalog;
-    $schemas{$schema}++   if $schema;
-    $tables{$table}++     if $table;
-    $cnt++;
-  }
-  ok( $cnt > 0,'At least one table has a primary key.');
-}
+} # SKIP
+# -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 ok( $dbh->disconnect,'Disconnect');

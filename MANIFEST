@@ -21,6 +21,8 @@ t/06ti.t
 t/07q.t
 t/11prep.t
 t/12bind.t
+t/12ins_b.t
+t/12ins_q.t
 t/13count.t
 t/14rows.t
 t/15large.t

@@ -10,13 +10,15 @@ use ADOTEST();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 3;
+  plan tests => 4;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
 
+pass('Foreign key tests');
+
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
-ok ( defined $dbh, 'Connection');
+pass('Database connection created');
 
 # -----------------------------------------------------------------------------
 SKIP: {
@@ -26,8 +28,8 @@ SKIP: {
   my $non_supported = '-2146825037';
   skip 'foreign_key_info not supported by provider', 1
     if $dbh->err && $dbh->err == $non_supported;
-  ok( defined $sth,"Statement handle defined for foreign_key_info()");
-  DBI::dump_results($sth) if defined $sth;
+  ok( defined $sth,'Statement handle defined for foreign_key_info()');
+  ADOTEST::dump_results( $sth );
 }
 # -----------------------------------------------------------------------------
 

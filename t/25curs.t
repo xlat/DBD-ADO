@@ -17,47 +17,57 @@ if (defined $ENV{DBI_DSN}) {
 
 pass('Cursor type tests');
 
-my $non_supported = '-2146825037';
+my $tbl = $ADOTEST::table_name;
+my @col = sort keys %ADOTEST::TestFieldInfo;
 
-my ( $pf, $sf );
+my $non_supported = '-2146825037';
 
 my $longstr = 'THIS IS A STRING LONGER THAN 80 CHARS.  THIS SHOULD BE CHECKED FOR TRUNCATION AND COMPARED WITH ITSELF.';
 my $longstr2 = $longstr . '  ' . $longstr . '  ' . $longstr . '  ' . $longstr;
+
+my $data =
+[
+  [ 3,'bletch'   ,'bletch varchar','1998-05-10 00:00:00']
+, [ 1,'foo'      ,'foo varchar'   ,'1998-05-11']
+, [ 2,'bar'      ,'bar varchar'   ,'1998-05-12']
+, [ 4,'80char'   , $longstr       ,'1998-05-13']
+, [ 5,'gt250char', $longstr2      ,'1998-05-14']
+];
 
 my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
   $dbh->{RaiseError} = 1;
   $dbh->{PrintError} = 0;
 pass('Database connection created');
 
-ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $ADOTEST::table_name");
+ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
-ok( tab_insert( $dbh ),'Insert test data');
+ok( tab_insert( $dbh, $data, \@col ),'Insert test data');
 ok( tab_select( $dbh ),'Select test data');
 
 my ( $sth1, $sth2 );
 pass('Test creating two statement handles. Execute in series.');
-ok( $sth1 = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A"),'Prepare statement handle 1');
-ok( $sth2 = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A"),'Prepare statement handle 2');
+ok( $sth1 = $dbh->prepare("SELECT * FROM $tbl ORDER BY A"),'Prepare statement handle 1');
+ok( $sth2 = $dbh->prepare("SELECT * FROM $tbl ORDER BY A"),'Prepare statement handle 2');
 
 ok( defined $sth1,'Statement handle 1 defined');
 ok( defined $sth2,'Statement handle 2 defined');
 {
   ok( $sth1->execute,'Execute statement handle 1');
   my $cnt = 0;
-  while( my $row = $sth1->fetch ) {
+  while ( my $row = $sth1->fetch ) {
     $cnt++;
 #   print "#\t", DBI::neat_list( $row ), "\n";
   }
-  ok( $cnt > 0,'Rows fetched > 0');
+  ok( $cnt > 0,"Rows fetched: $cnt > 0");
 }
 {
   ok( $sth2->execute,'Execute statement handle 2');
   my $cnt = 0;
-  while( my $row = $sth2->fetch ) {
+  while ( my $row = $sth2->fetch ) {
     $cnt++;
 #   print "#\t", DBI::neat_list( $row ), "\n";
   }
-  ok( $cnt > 0,'Rows fetched > 0');
+  ok( $cnt > 0,"Rows fetched: $cnt > 0");
 }
 undef $sth1;
 undef $sth2;
@@ -66,7 +76,7 @@ undef $sth2;
 
 my @CursorTypes = qw(adOpenForwardOnly adOpenKeyset adOpenDynamic adOpenStatic);
 for my $ct ( @CursorTypes ) {
-  my $sth = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A", { CursorType => $ct } );
+  my $sth = $dbh->prepare("SELECT * FROM $tbl ORDER BY A", { CursorType => $ct } );
   ok( $sth,"Prepare statement handle using CursorType => $ct");
   my $rc = $sth->execute;
   SKIP: {
@@ -75,11 +85,11 @@ for my $ct ( @CursorTypes ) {
     ok( $rc,"Execute statement handle using CursorType => $ct : $rc");
 
     my $cnt = 0;
-    while( my $row = $sth->fetch ) {
+    while ( my $row = $sth->fetch ) {
       $cnt++;
 #     print "#\t", DBI::neat_list( $row ), "\n";
     }
-    ok( $cnt > 0,"Rows fetched > 0           for CursorType => $ct");
+    ok( $cnt > 0,"Rows fetched: $cnt > 0        for CursorType => $ct");
   }
   ok( $sth->finish,"Finish  statement handle using CursorType => $ct");
 }
@@ -118,29 +128,28 @@ for my $ct ( @CursorTypes ) {
 #
 # }
 
-ok( $dbh->do("DROP TABLE $ADOTEST::table_name"),"DROP TABLE $ADOTEST::table_name");
+ok( ADOTEST::tab_delete( $dbh ),'Drop test table');
 
 ok( $dbh->disconnect,'Disconnect');
+
 
 sub tab_select  # similar to 02simple.t
 {
   my $dbh = shift;
   my $rowcount = 0;
 
-  my $sth = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A")
-    or return undef;
+  my $sth = $dbh->prepare("SELECT * FROM $tbl ORDER BY A") or return undef;
   $sth->execute;
   while ( my $row = $sth->fetch )  {
-    # print "# -- $row->[0] $row->[1] $row->[2] $row->[3]\n";
+    print "# -- $row->[0] $row->[1] $row->[2] $row->[3]\n";
     ++$rowcount;
   }
   if ( $rowcount == 0 ) {
-    # print "# -- Basic retrieval of rows not working!\n";
+    print "# -- Basic retrieval of rows not working!\n";
     return 0;
   }
 
-  $sth = $dbh->prepare("SELECT A,C FROM $ADOTEST::table_name WHERE A>=4")
-    or return undef;
+  $sth = $dbh->prepare("SELECT A, C FROM $tbl WHERE A >= 4") or return undef;
   $rowcount = 0;
   $sth->execute;
   while ( my $row = $sth->fetch ) {
@@ -171,47 +180,19 @@ sub tab_select  # similar to 02simple.t
   return 1;
 }
 
-#
-# show various ways of inserting data without binding parameters.
-# Note, these are not necessarily GOOD ways to
-# show this...
-#
-sub tab_insert {  # similar to 02simple.t
-  my $dbh = shift;
+sub tab_insert {
+  my $dbh  = shift;
+  my $data = shift;
+  my $cols = shift;
 
-  # Determine if an escape sequence is usable.
-  my $ti = ADOTEST::get_type_for_column( $dbh,'D');
-  $pf = $ti->{LITERAL_PREFIX};
-  $sf = $ti->{LITERAL_SUFFIX};
-  $pf = qq/{d \'/ unless $pf;  #'
-  $sf = qq/\' }/  unless $sf;  #'
-  # qeDBF needs a space after the table name!
+  my $sth = $dbh->prepare("INSERT INTO $tbl( A, B, C, D ) VALUES( ?, ?, ?, ? )");
 
-  print "# -- Building dates using: $pf $sf\n";
-  my $dt = qq{${pf}1998-05-10 00:00:00${sf}};
-  my $stmt = "INSERT INTO $ADOTEST::table_name( A, B, C, D ) VALUES("
-    . join(', ', 3, $dbh->quote('bletch'), $dbh->quote('bletch varchar'), $dt ) . ')';
-  my $sth = $dbh->prepare( $stmt ) or die "prepare: $stmt: $DBI::errstr";
-  $sth->execute or die "execute: $stmt: $DBI::errstr";
-  $sth->finish;
-
-  $dt = qq{${pf}1998-05-11${sf}};
-  $dbh->do(qq{INSERT INTO $ADOTEST::table_name ( A, B, C, D ) VALUES ( 1, 'foo', 'foo varchar', $dt )} );
-  $dt = qq{${pf}1998-05-12${sf}};
-  $dbh->do(qq{INSERT INTO $ADOTEST::table_name ( A, B, C, D ) VALUES ( 2, 'bar', 'bar varchar', $dt )} );
-  $dt = qq{${pf}1998-05-13${sf}};
-  print '# -- Length of long string ', length($longstr), "\n";
-  $stmt = "INSERT INTO $ADOTEST::table_name ( A, B, C, D ) VALUES ("
-    . join(', ', 4, $dbh->quote('80char'), $dbh->quote( $longstr ), $dt ) . ')';
-  $sth = $dbh->prepare( $stmt ) or die "prepare: $stmt: $DBI::errstr";
-  $sth->execute or die "execute: $stmt: $DBI::errstr";
-  $sth->finish;
-  $dt = qq{${pf}1998-05-14${sf}};
-  print '# -- Length of long string 2 ', length( $longstr2 ), "\n";
-  $stmt = "INSERT INTO $ADOTEST::table_name (A, B, C, D) VALUES ("
-    . join(', ', 5, $dbh->quote('gt250char'), $dbh->quote( $longstr2 ), $dt ) . ')';
-  $sth = $dbh->prepare($stmt) or die "prepare: $stmt: $DBI::errstr";
-  $sth->execute or die "execute: $stmt: $DBI::errstr";
-  $sth->finish;
+  for ( @$data ) {
+    for my $i ( 0..$#$cols ) {
+      my $ti = ADOTEST::get_type_for_column( $dbh, $cols->[$i] );
+      $sth->bind_param( $i+1, $_->[$i], { TYPE => $ti->{DATA_TYPE} } );
+    }
+    $sth->execute;
+  }
   return 1;
 }

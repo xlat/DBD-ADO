@@ -28,7 +28,7 @@ my $cnt = 7;
 ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
 is( $dbh->do("INSERT INTO $tbl( A, B ) VALUES( $_,'T$_')"), 1,"($_) Insert")
-  for 1..7;
+  for 1..$cnt;
 
 my $sth = $dbh->prepare("SELECT * FROM $tbl");
 is( $sth->rows, -1,'Rows (prepare) :'. $sth->rows );
@@ -39,7 +39,7 @@ for ( 1..2 ) {  # (re)execute
   my $i = 0;
   while ( my $row = $sth->fetch ) {
     is( $sth->rows, ++$i,"($_) Rows so far: $i");
-#   print "-- $i: ", DBI::neat_list( $row ),"\n";
+#   print "# Row $i: ", DBI::neat_list( $row ),"\n";
   }
   is( $sth->rows, $cnt,"($_) Rows total : $cnt");
 }

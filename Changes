@@ -1,3 +1,22 @@
+2004-10-17  2.93
+
+  Implemented do().
+
+  Changed $sth->DESTROY to call finish( $sth ) instead of $sth->finish.
+  The old call caused clearing of errors e.g. in $dbh->do().
+
+  Replaced duplicated code in disconnect() with a call to rollback().
+
+  Minor changes to db/st handle attributes.
+
+  Minor changes to table_info()'s parameter handling.
+
+  Modified tests (t/19misc.t, t/25curs.t) to use bind_param().
+
+  Added INSERT tests (t/12ins_b.t, t/12ins_q.t).
+
+  Documented a SQLOLEDB bug, reported by Vahe Sarkissian.
+
 2004-09-19  2.92
 
   Enabled and reimplemented LOB tests (t/27lob.t, t/19misc.t).

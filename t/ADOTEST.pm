@@ -180,4 +180,18 @@ sub tab_long_create {
   return $dbh->do("CREATE TABLE $tbl( $fields )");
 }
 
+sub dump_results {
+  my $sth = shift;
+  my $rows = 0;
+
+  return 0 unless $sth;
+
+  while ( my $row = $sth->fetch ) {
+    $rows++;
+    print '# ', DBI::neat_list( $row ),"\n";
+  }
+  print "# $rows rows\n";
+  $rows;
+}
+
 1;

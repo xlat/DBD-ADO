@@ -10,7 +10,7 @@ use ADOTEST();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 7;
+  plan tests => 21;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -21,7 +21,7 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
 SKIP: {
-  skip('SQLOLEDB specific tests', 4 )
+  skip('SQLOLEDB specific tests', 18 )
     if $dbh->{ado_conn}{Provider} !~ /^SQLOLEDB/;
 
   $dbh->{AutoCommit} = 0;
@@ -30,23 +30,39 @@ SKIP: {
 
   my $sql = "CREATE PROCEDURE $proc AS waitfor delay '00:00:07'";
 
-  ok( $dbh->do( $sql ), $sql );
+  ok( $dbh->do( $sql ),"do: $sql");
 
-  ok( $dbh->do( $proc ), $proc );
+  is( $dbh->{ado_commandtimeout}, 30,'dbh ado_commandtimeout');
+
+  ok( $dbh->do( $proc ),"do: $proc");
 
   $dbh->{ado_commandtimeout} = 2;
-  $dbh->{RaiseError} = 1;
+  is( $dbh->{ado_commandtimeout}, 2,'dbh ado_commandtimeout');
+
   $dbh->{PrintError} = 0;
   $dbh->{Warn}       = 0;
 
-  my $rc = eval { $dbh->do( $proc ) };
-  ok(!$rc,"$proc (timeout=$dbh->{ado_commandtimeout})");
-  like( $@, qr/HYT00/,'Error expected: HYT00');
+  ok(!$dbh->do( $proc ),"do: $proc (timeout=$dbh->{ado_commandtimeout})");
 
-  # TODO: uninitialized ... Why?
-  #like( $dbh->errstr, qr/Timeout expired/, "Error expected: Timeout expired");  # language dependent?
-  #like( $dbh->errstr, qr/HYT00/          ,'Error expected: HYT00');
-  #is  ( $dbh->state ,'HYT00'             ,'SQLState');
-  #is  ( $dbh->err   , -2147217871        ,'Error Number'); # 0x80040E31
+  like( $dbh->errstr, qr/HYT00/          ,'Error expected: HYT00');
+# like( $dbh->errstr, qr/Timeout expired/,'Error expected: Timeout expired');  # language dependent?
+  is  ( $dbh->state ,'HYT00'             ,'SQLState');
+  is  ( $dbh->err   , -2147217871        ,'Error Number');  # 0x80040E31
+
+  my $sth = $dbh->prepare( $proc );
+  is( $sth->{ado_commandtimeout}, 2,'sth ado_commandtimeout');
+
+  ok(!$sth->execute,'execute');
+  like( $sth->errstr, qr/HYT00/          ,'Error expected: HYT00');
+  is  ( $sth->state ,'HYT00'             ,'SQLState');
+  is  ( $sth->err   , -2147217871        ,'Error Number');
+
+  $sth->{ado_commandtimeout} = 1;
+  is( $sth->{ado_commandtimeout}, 1,'sth ado_commandtimeout');
+
+  ok(!$sth->execute,'execute');
+  like( $sth->errstr, qr/HYT00/          ,'Error expected: HYT00');
+  is  ( $sth->state ,'HYT00'             ,'SQLState');
+  is  ( $sth->err   , -2147217871        ,'Error Number');
 }
 ok( $dbh->disconnect,'Disconnect');
