@@ -1,3 +1,12 @@
+2004-01-25  2.86
+
+  Added support for $sth->{ParamValues}.
+
+  Added attribute $h->{ado_max_errors} to avoid time-consuming processing
+  of huge error collections, suggested by Peter Hircock.
+
+  Removed private attributes from database and statement handles.
+
 2004-01-18  2.85
 
   Improved error handling to avoid problems with success/informational

@@ -3,13 +3,27 @@ Adjust return codes wrt the spec
 
 Change tests to use bind_param() more often.
 
-Add $sth->{ParamValues}
-
 sub fetchrow_arrayref:
   if UNIVERSAL::isa($_, 'Win32::OLE::Variant') => drop?
   $_->As( Win32::OLE::Variant::VT_BSTR() => still Win32::OLE::Variant?
   $rs->Fields($_->{Name})->{Value} => in() ?
     see max(id), min(id)
+
+
+ParamValues: What's the reason for the following problem?
+
+  sub FETCH {
+    ...
+    if ( $attrib eq 'ParamValues') {
+      my $comm = $sth->{ado_comm};
+      my $p = $comm->Parameters;  # ??? supresses '... with ParamValues: 1=77]'
+      my $h = {};
+      for ( Win32::OLE::in( $sth->{ado_comm}->Parameters ) ) {
+        $h->{$_->Name} = $_->Value;
+      }
+      return $h;
+    }
+
 
 Improve type_info_all
 

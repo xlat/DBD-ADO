@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state $errcum);
 
-  $VERSION = '2.85';
+  $VERSION = '2.86';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    =  0;     # The $DBI::err value
@@ -31,6 +31,7 @@
 
   sub errors {
     my $Conn = shift;
+    my $MaxErrors = shift || 50;
     my @Err  = ();
 
     my $lastError = Win32::OLE->LastError;
@@ -45,8 +46,14 @@
     }
     if ( ref $Conn ) {
       my $Errors = $Conn->Errors;
-      if ( $Errors && $Errors->Count ) {
-        for my $err ( Win32::OLE::in( $Errors ) ) {
+      if ( $Errors ) {
+        my $Count = $Errors->Count;
+        for ( my $i = 1; $i <= $Count; $i++ ) {
+          if ( $i > $MaxErrors ) {
+            push @Err, "\n    ... (too many errors: $Count)";
+            $i = $Count;
+          }
+          my $err = $Errors->Item( $i - 1 );
           push @Err, '';
           push @Err, sprintf "%19s : %s", $_, $err->$_ ||'' for qw(
             Description HelpContext HelpFile NativeError Number Source SQLState);
@@ -63,7 +70,8 @@
   sub Failed {
     my $h   = shift;
 
-    my $lastError = DBD::ADO::errors( $h->{ado_conn} ) or return 0;
+    my $lastError = DBD::ADO::errors( $h->{ado_conn}, $h->{ado_max_errors} )
+      or return 0;
 
     my ( $package, $filename, $line ) = caller;
     my $s = shift()
@@ -120,22 +128,7 @@
 			Warn => 0,
 			LongReadLen => 0,
 			LongTruncOk => 0,
-		},
-		{
-		  ado_conn						=> undef
-		, ado_cursortype			=> undef
-		, ado_commandtimeout	=> undef
-		, Attributes					=> undef
-		, CommandTimeout			=> undef
-		, ConnectionString		=> undef
-		, ConnectionTimeout		=> undef
-		, CursorLocation			=> undef
-		, DefaultDatabase			=> undef
-		, IsolationLevel			=> undef
-		, Mode								=> undef
-		, Provider						=> undef
-		, State								=> undef
-		, Version							=> undef
+			ado_max_errors => 50,
 		});
 
 		# Get the default value;
@@ -411,23 +404,10 @@ my $sch_dbi_to_ado = {
 		, SCALE				=> undef
 		, NULLABLE		=> undef
 		, CursorName	=> undef
+		, ParamValues	=> {}
 		, RowsInCache	=> 0
+		, ado_max_errors => $dbh->{ado_max_errors}
 		, ado_type		=> undef
-		}, {
-		  ado_comm			=> $comm
-		, ado_attribs		=> $attribs
-		, ado_commandtimeout => undef
-		, ado_conn			=> $conn
-		, ado_cursortype => undef
-		, ado_dbh				=> $dbh
-		, ado_fields		=> undef
-		, ado_params		=> []
-		, ado_refresh		=> 1
-		, ado_rownum		=> -1
-		, ado_rows			=> -1
-		, ado_rowset		=> undef
-		, ado_usecmd		=> undef
-		, ado_users			=> undef
 		});
 
 		$outer->STORE( LongReadLen	=> 0 );
@@ -443,7 +423,6 @@ my $sch_dbi_to_ado = {
 		$sth->{ado_conn}		= $conn;
 		$sth->{ado_dbh}			= $dbh;
 		$sth->{ado_fields}	= undef;
-		$sth->{ado_params}	= [];
 		$sth->{ado_refresh}	= 1;
 		$sth->{ado_rownum}	= -1;
 		$sth->{ado_rows}		= -1;
@@ -529,26 +508,16 @@ my $sch_dbi_to_ado = {
 		, LongReadLen	=> 0
 		, LongTruncOk	=> 0
 		, CursorName	=> undef
+		, ParamValues	=> {}
 		, RowsInCache	=> 0
+		, ado_max_errors => $dbh->{ado_max_errors}
 		, ado_type		=> [ map { $_->Type } @$ado_fields ]
-		}, {
-		  ado_attribs	=> $attribs
-		, ado_comm		=> $conn
-		, ado_conn 		=> $conn
-		, ado_dbh			=> $dbh
-		, ado_fields	=> $ado_fields
-		, ado_params	=> []
-		, ado_refresh	=> 0
-		, ado_rownum	=> 0
-		, ado_rows		=> -1
-		, ado_rowset	=> $rs
 		});
 
 		$sth->{ado_comm}		= $conn;
 		$sth->{ado_conn}		= $conn;
 		$sth->{ado_dbh}			= $dbh;
 		$sth->{ado_fields}	= $ado_fields;
-		$sth->{ado_params}	= [];
 		$sth->{ado_refresh}	= 0;
 		$sth->{ado_rownum}	= 0;
 		$sth->{ado_rows}		= -1;
@@ -1288,9 +1257,6 @@ my $sch_dbi_to_ado = {
 
   $DBD::ADO::st::imp_data_size = 0;
 
-	use constant NOT_SUPPORTED => '-2147217839';
-	use constant EXCEPTION_OCC => '-2147352567';
-
   my $ado_consts = DBD::ADO::Const->Enums;
 
   my $VT_I4_BYREF = Win32::OLE::Variant::VT_I4() | Win32::OLE::Variant::VT_BYREF();
@@ -1354,7 +1320,7 @@ my $sch_dbi_to_ado = {
 
     return $sth->set_err( -915,"Bind Parameter $pNum outside current range of $param_cnt.") if $pNum > $param_cnt || $pNum < 1;
 
-    $sth->{ado_params}->[$pNum-1] = $val;
+    $sth->{ParamValues}{$pNum} = $val;
 
     my $i = $comm->Parameters->Item( $pNum - 1 );
 
@@ -1412,41 +1378,6 @@ my $sch_dbi_to_ado = {
 		my $lastError;
 
 		my $rs;
-		my $p = $comm->Parameters;
-		$lastError = DBD::ADO::errors($conn);
-		return $sth->set_err( $DBD::ADO::err || -1,"Execute Parameters failed 'ADODB.Command': $lastError") if $lastError and $DBD::ADO::err ne NOT_SUPPORTED;
-
-		my $not_supported = ( $DBD::ADO::err eq NOT_SUPPORTED ) || 0;
-
-		$sth->trace_msg("    -- Not Supported flag: $not_supported\n", 5 );
-
-		my $parm_cnt = 0;
-		# Need to test if we can access the parameter attributes.
-		{
-			# Turn the OLE Warning Off for this test.
-			local $Win32::OLE::Warn = 0;
-			$parm_cnt = $p->{Count};
-			$lastError = DBD::ADO::errors($conn);
-			$not_supported = ( $DBD::ADO::err eq EXCEPTION_OCC ) || 0;
-		}
-
-		$sth->trace_msg("    -- Is the Parameter Object Supported? " . ($not_supported ? 'No' : 'Yes') . "\n", 5 );
-
-		# Remember if the provider errored with a "not supported" message.
-
-		# If the provider errored with not_supported above in the Parameters
-		# methods, do not attempt to display anything about the object.  If we
-		# it triggers warning message.
-		unless ( $not_supported ) {
-			$sth->trace_msg("    -- Parameter count: " . $p->{Count} . "\n", 5 );
-			my $x = 0;
-			while ( $x < $p->{Count} ) {
-				my $params = $sth->{ado_params};
-				$sth->trace_msg("    -- Parameter $x: " . ($p->Item($x)->{Value}||'undef') . "\n", 5 );
-				$sth->trace_msg("    -- Parameter $x: " . ($params->[$x]||'undef') . "\n", 5 );
-				$x++;
-			}
-		}
 
 		# Return the affected number to rows.
 		my $rows = Win32::OLE::Variant->new( $VT_I4_BYREF, 0 );
@@ -1695,20 +1626,10 @@ DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
 
 =head1 SYNOPSIS
 
-  use DBI;
+  use DBI();
 
-  $dbh = DBI->connect("dbi:ADO:dsn", $user, $passwd);
+  my $dbh = DBI->connect("dbi:ADO:$dsn", $usr, $pwd, $att ) or die $DBI::errstr;
 
-	Options in the connect string:
-	dbi:ADO:dsn;CommandTimeout=60 (your number)
-	dbi:ADO:dsn;ConnectTimeout=60 (your number)
-	or include both ConnectTimeout and CommandTimeout.
-
-	The dsn may be a standard ODBC dsn or a dsn-less.
-	See the ADO documentation for more information on
-	the dsn-less connection.
-
-  # See the DBI module documentation for full details
 
 =head1 DESCRIPTION
 
@@ -1716,16 +1637,37 @@ The DBD::ADO module supports ADO access on a Win32 machine.
 DBD::ADO is written to support the standard DBI interface to
 data sources.
 
+
 =head1 Connection
 
-  $dbh = DBI->connect("dbi:ADO:$dsn", $user, $passwd, $attribs );
+Use the DBI connect method to establish a database connection:
 
-Connection supports dsn and dsn-less calls.
+  my $dbh = DBI->connect("dbi:ADO:$dsn", $usr, $pwd, $att ) or die $DBI::errstr;
 
-  $dbh = DBI->connect('dbi:ADO:File Name=oracle.udl', $user, $passwd,
-    { RaiseError => [0|1], PrintError => [0|1], AutoCommit => [0|1]} );
+where
 
-In addition the following attributes may be set in the connect string:
+  $dsn - is an ADO ConnectionString
+  $usr - is a user name
+  $pwd - is a password
+  $att - is a hash reference with additional attributes
+
+Typical connection attributes are
+
+  RaiseError => 1
+  PrintError => 0
+  AutoCommit => 0
+
+See the DBI module documentation for full details.
+
+An ADO ConnectionString usually contains either a 'Provider' or a
+'File Name' argument. If you omit these arguments, Provider defaults
+to MSDASQL (Microsoft OLE DB Provider for ODBC). Therefore you can
+pass an ODBC connection string (with DSN or DSN-less) as valid ADO
+connection string.
+If you use the OLE DB Provider for ODBC, it may be better to omit this
+additional layer and use DBD::ODBC with the ODBC driver.
+
+In addition the following attributes may be set in the connection string:
 
   Attributes
   CommandTimeout
@@ -1735,10 +1677,23 @@ In addition the following attributes may be set in the connect string:
   DefaultDatabase
   IsolationLevel
   Mode
-  Provider
 
 B<Warning:> The application is responsible for passing the correct
 information when setting any of these attributes.
+
+See the ADO documentation for more information on connection strings.
+
+ADO ConnectionString examples:
+
+  test
+  File Name=test.udl
+  Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\data\test.mdb
+  Provider=VFPOLEDB;Data Source=C:\data\test.dbc
+  Provider=MSDAORA
+
+For more examples, see e.g.:
+
+  http://www.able-consulting.com/tech.htm
 
 
 =head1 ADO-specific methods
@@ -1969,6 +1924,10 @@ handling mechanisms.
 The standard SQLSTATE is seldom supported by ADO providers and cannot be
 relied on.
 
+The db/st handle attribute 'ado_max_errors' limits the number of errors
+extracted from the errors collection. To avoid time-consuming processing
+of huge error collections, it defaults to 50.
+
 
 =head1 CAVEATS
 
@@ -2003,12 +1962,14 @@ It is strongly recommended that you use the latest version of ADO
 
   http://www.microsoft.com/Data/download.htm
 
+
 =head1 AUTHORS
 
 Tim Bunce and Phlip. With many thanks to Jan Dubois and Jochen Wiedmann
 for additions, debuggery and general help.
 Special thanks to Thomas Lowery, who maintained this module 2001-2003.
 Current maintainer is Steffen Goeldner.
+
 
 =head1 SUPPORT
 
@@ -2018,6 +1979,7 @@ mailing list by sending a message to dbi-users-help@perl.org
 
 Please post details of any problems (or changes you needed to make) to
 dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
+
 
 =head1 COPYRIGHT
 
@@ -2034,12 +1996,20 @@ dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
   You may distribute under the terms of either the GNU General Public
   License or the Artistic License, as specified in the Perl README file.
 
+
 =head1 SEE ALSO
 
-ADO Reference book:  ADO 2.0 Programmer's Reference, David Sussman and
-Alex Homer, Wrox, ISBN 1-861001-83-5. If there's anything better please
-let me know.
+=head2 Books
 
-http://www.able-consulting.com/tech.htm
+  ADO Reference book:  ADO 2.0 Programmer's Reference
+  David Sussman and Alex Homer
+  Wrox
+  ISBN 1-861001-83-5
+
+If there's anything better please let me know.
+
+=head2 Perl modules
+
+L<DBI>, L<DBD::ODBC>, L<Win32::OLE>
 
 =cut
