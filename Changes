@@ -1,3 +1,10 @@
+2004-02-01  2.87
+
+  Fixed a bug when fetching data from a result set with non-unique
+  column names, reported by Ed Belisle.
+
+  Removed DBD::ADO::dr::DESTROY.
+
 2004-01-25  2.86
 
   Added support for $sth->{ParamValues}.

@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state $errcum);
 
-  $VERSION = '2.86';
+  $VERSION = '2.87';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    =  0;     # The $DBI::err value
@@ -17,11 +17,10 @@
   sub driver {
     return $drh if $drh;
     my($class, $attr) = @_;
-    $class .= "::dr";
-    ($drh) = DBI::_new_drh( $class, {
-      'Name' 				=> 'ADO',
-      'Version' 		=> $VERSION,
-      'Attribution' => 'DBD ADO for Win32 by Tim Bunce, Phlip, Thomas Lowery and Steffen Goeldner',
+    $drh = DBI::_new_drh( $class . '::dr', {
+      Name        => 'ADO'
+    , Version     => $VERSION
+    , Attribution => 'DBD ADO for Win32 by Tim Bunce, Phlip, Thomas Lowery and Steffen Goeldner'
     });
     if ( $DBI::VERSION >= 1.37 ) {
       DBD::ADO::db->install_method('ado_open_schema');
@@ -214,18 +213,6 @@
 	}
 
   sub disconnect_all { }
-
-	sub DESTROY {
-		my $self = shift;
-		my $conn = $self->{ado_conn};
-		my $auto = $self->{AutoCommit};
-		if (defined $conn) {
-			$conn->RollbackTrans unless $auto
-				and not $self->{ado_provider_support_auto_commit};
-		my $lastError = DBD::ADO::errors($conn);
-		return $self->set_err( $DBD::ADO::err || -1,"Failed to Destory: $lastError") if $lastError;
-		}
-	}
 
 } # ====== DRIVER ======
 
@@ -584,7 +571,7 @@ my $sch_dbi_to_ado = {
 		my @tp;
 		my $field_names = $attribs->{ADO_Columns}
 			?  $ado_schematables : $ado_dbi_schematables;
-		my $oRec;
+		my $rs;
 
 		#
 		# If the value of $catalog is '%' and $schema and $table name are empty
@@ -596,7 +583,7 @@ my $sch_dbi_to_ado = {
 			# This is the easy way to determine catalog support.
 			eval {
 				local $Win32::OLE::Warn = 0;
-				$oRec = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaCatalogs});
+				$rs = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaCatalogs});
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die "Died on:\n$lastError" if $lastError;
@@ -604,11 +591,11 @@ my $sch_dbi_to_ado = {
 			$dbh->trace_msg( "->	Eval of adSchemaCatalogs died for $@\n" )
 				if $@;
 			$dbh->trace_msg( "->	Rule 19a\n" );
-			if ( $oRec ) {
+			if ( $rs ) {
 				$dbh->trace_msg( "->	Rule 19a, record set defined\n" );
-				while(! $oRec->{EOF}) {
-					push @tp, [ $oRec->Fields(0)->{Value}, undef, undef, undef, undef ];
-					$oRec->MoveNext;
+				while ( !$rs->{EOF} ) {
+					push @tp, [ $rs->Fields(0)->{Value}, undef, undef, undef, undef ];
+					$rs->MoveNext;
 				}
 			}
 			else {
@@ -616,7 +603,7 @@ my $sch_dbi_to_ado = {
 				# to still return a list of catalogs.
 				$dbh->trace_msg( "->	Rule 19a, record set undefined\n" );
 				my $csth = $dbh->table_info( { Trim_Catalog => 1 } );
-				if ($csth) {
+				if ( $csth ) {
           my $ref = {};
           my $Undef = 0;  # for 'undef' hash keys (which mutate to '')
           while ( my $Row = $csth->fetch ) {
@@ -639,7 +626,7 @@ my $sch_dbi_to_ado = {
 				 && (defined $attribs->{TABLE_NAME} and $attribs->{TABLE_NAME}  eq '') ) { # Rule 19b
 			eval {
 				local $Win32::OLE::Warn = 0;
-				$oRec = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaSchemata});
+				$rs = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaSchemata});
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die "Died on:\n$lastError" if $lastError;
@@ -647,11 +634,11 @@ my $sch_dbi_to_ado = {
 			$dbh->trace_msg( "->	Eval of adSchemaSchemata died for $@\n" )
 				if $@;
 			$dbh->trace_msg( "->	Rule 19b\n" );
-			if ( $oRec ) {
+			if ( $rs ) {
 				$dbh->trace_msg( "->	Rule 19b, record set defined\n" );
-				while(! $oRec->{EOF}) {
-					push @tp, [ $oRec->Fields(0)->{Value}, $oRec->Fields(1)->{Value}, undef, undef, undef ];
-					$oRec->MoveNext;
+				while ( !$rs->{EOF} ) {
+					push @tp, [ $rs->Fields(0)->{Value}, $rs->Fields(1)->{Value}, undef, undef, undef ];
+					$rs->MoveNext;
 				}
 			}
 			else {
@@ -659,7 +646,7 @@ my $sch_dbi_to_ado = {
 				# to still return a list of schemas.
 				$dbh->trace_msg( "->	Rule 19b, record set undefined\n" );
 				my $csth = $dbh->table_info( { Trim_Catalog => 1 } );
-				if ($csth) {
+				if ( $csth ) {
           my $ref = {};
           my $Undef = 0;  # for 'undef' hash keys (which mutate to '')
           while ( my $Row = $csth->fetch ) {
@@ -692,28 +679,27 @@ my $sch_dbi_to_ado = {
 			@criteria = (undef); # ADO needs at least one element in the criteria array!
 			for (my $i=0; $i<@$ado_dbi_schematables; $i++) {
 				my $field = $ado_dbi_schematables->[$i];
-				if (exists $attribs->{$field}) {
+				if ( exists $attribs->{$field} ) {
 					$criteria[$i] = $attribs->{$field};
 				}
 			}
 
 			eval {
 				local $Win32::OLE::Warn = 0;
-				$oRec = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaTables}, \@criteria);
+				$rs = $dbh->{ado_conn}->OpenSchema($ado_consts->{SchemaEnum}{adSchemaTables}, \@criteria);
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die "Died on:\n$lastError" if $lastError;
 			};
 			$dbh->trace_msg( "->	Eval of adSchemaTables died for $@\n" )
 				if $@;
-			if ($oRec) {
-
-				if (exists $attribs->{Filter}) {
-					$oRec->{Filter} = $attribs->{Filter};
+			if ( $rs ) {
+				if ( exists $attribs->{Filter} ) {
+					$rs->{Filter} = $attribs->{Filter};
 				}
 
-				while(! $oRec->{EOF}) {
-					my @out = map { $oRec->Fields($_)->{Value} }
+				while ( !$rs->{EOF} ) {
+					my @out = map { $rs->Fields($_)->{Value} }
 						map { $sch_dbi_to_ado->{$_} } @$field_names;
 					# Jan Dubois jand@activestate.com addition to handle changes
 					# in Win32::OLE return of Variant types of data.
@@ -721,12 +707,12 @@ my $sch_dbi_to_ado = {
 						$_ = $_->As( Win32::OLE::Variant::VT_BSTR() )
 							if ( defined $_ ) && ( UNIVERSAL::isa( $_, 'Win32::OLE::Variant') );
 					}
-					if ($attribs->{Trim_Catalog}) {
+					if ( $attribs->{Trim_Catalog} ) {
 						$out[0] =~ s/^(.*\\)// if defined $out[0];  # removes leading
 						$out[0] =~ s/(\..*)$// if defined $out[0];  # removes file extension
 					}
 					push( @tp, \@out );
-					$oRec->MoveNext;
+					$rs->MoveNext;
 				}
 			}
 			else {
@@ -734,8 +720,8 @@ my $sch_dbi_to_ado = {
 			}
 		}
 
-		$oRec->Close if $oRec;
-		$oRec = undef;
+		$rs->Close if $rs;
+		$rs = undef;
 		$dbh->{ado_conn}->{CursorLocation} = $tmpCursorLocation;
 
 		my $statement = "adSchemaTables";
@@ -756,25 +742,25 @@ my $sch_dbi_to_ado = {
 		my $tmpCursorLocation = $conn->{CursorLocation};
 		$conn->{CursorLocation} = $ado_consts->{CursorLocationEnum}{adUseClient};
 
-		my $RecSet = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$QueryType}, $Criteria );
+		my $rs = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$QueryType}, $Criteria );
 		return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
 
-		$RecSet->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION';
+		$rs->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION';
 		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order ");
 
-		while ( ! $RecSet->{EOF} ) {
-			my $AdoType    = $RecSet->Fields('DATA_TYPE'   )->{Value};
-			my $ColFlags   = $RecSet->Fields('COLUMN_FLAGS')->{Value};
+		while ( !$rs->{EOF} ) {
+			my $AdoType    = $rs->Fields('DATA_TYPE'   )->{Value};
+			my $ColFlags   = $rs->Fields('COLUMN_FLAGS')->{Value};
 			my $IsLong     = ( $ColFlags & $ado_consts->{FieldAttributeEnum}{adFldLong } ) ? 1 : 0;
 			my $IsFixed    = ( $ColFlags & $ado_consts->{FieldAttributeEnum}{adFldFixed} ) ? 1 : 0;
 			my @SqlType    = DBD::ADO::TypeInfo::ado2dbi( $AdoType, $IsFixed, $IsLong );
-			my $IsNullable = $RecSet->Fields('IS_NULLABLE')->{Value} ? 'YES' : 'NO';
-			my $ColSize    = $RecSet->Fields('NUMERIC_PRECISION'       )->{Value}
-			              || $RecSet->Fields('CHARACTER_MAXIMUM_LENGTH')->{Value}
+			my $IsNullable = $rs->Fields('IS_NULLABLE')->{Value} ? 'YES' : 'NO';
+			my $ColSize    = $rs->Fields('NUMERIC_PRECISION'       )->{Value}
+			              || $rs->Fields('CHARACTER_MAXIMUM_LENGTH')->{Value}
 										|| 0;  # Default value to stop warnings ???
 			my $TypeName;
 			my $ado_tis    = DBD::ADO::db::_ado_get_type_info_for( $dbh, $AdoType, $IsFixed, $IsLong );
-			$dbh->trace_msg('  *** ' . $RecSet->Fields('COLUMN_NAME')->{Value} . "($ColSize): $AdoType, $IsFixed, $IsLong\n", 3 );
+			$dbh->trace_msg('  *** ' . $rs->Fields('COLUMN_NAME')->{Value} . "($ColSize): $AdoType, $IsFixed, $IsLong\n", 3 );
 			# find the first type which has a large enough COLUMN_SIZE:
 			for my $ti ( sort { $a->{COLUMN_SIZE} <=> $b->{COLUMN_SIZE} } @$ado_tis ) {
 				$dbh->trace_msg("    * => $ti->{TYPE_NAME}($ti->{COLUMN_SIZE})\n", 3 );
@@ -786,29 +772,30 @@ my $sch_dbi_to_ado = {
 			# unless $TypeName: Standard SQL type name???
 
 			my @Fields;
-			$Fields[ 0] = $RecSet->Fields('TABLE_CATALOG'           )->{Value}; # TABLE_CAT
-			$Fields[ 1] = $RecSet->Fields('TABLE_SCHEMA'            )->{Value}; # TABLE_SCHEM
-			$Fields[ 2] = $RecSet->Fields('TABLE_NAME'              )->{Value}; # TABLE_NAME
-			$Fields[ 3] = $RecSet->Fields('COLUMN_NAME'             )->{Value}; # COLUMN_NAME
-			$Fields[ 4] = $SqlType[0]                                         ; # DATA_TYPE !!!
-			$Fields[ 5] = $TypeName                                           ; # TYPE_NAME !!!
-			$Fields[ 6] = $ColSize                                            ; # COLUMN_SIZE !!! MAX for *LONG*
-			$Fields[ 7] = $RecSet->Fields('CHARACTER_OCTET_LENGTH'  )->{Value}; # BUFFER_LENGTH !!! MAX for *LONG*, ... (e.g. num)
-			$Fields[ 8] = $RecSet->Fields('NUMERIC_SCALE'           )->{Value}; # DECIMAL_DIGITS ???
-			$Fields[ 9] = undef                                               ; # NUM_PREC_RADIX !!!
-			$Fields[10] = $RecSet->Fields('IS_NULLABLE'             )->{Value}; # NULLABLE !!!
-			$Fields[11] = $RecSet->Fields('DESCRIPTION'             )->{Value}; # REMARKS
-			$Fields[12] = $RecSet->Fields('COLUMN_DEFAULT'          )->{Value}; # COLUMN_DEF
-			$Fields[13] = $SqlType[1]                                         ; # SQL_DATA_TYPE !!!
-			$Fields[14] = $SqlType[2]                                         ; # SQL_DATETIME_SUB !!!
-			$Fields[15] = $RecSet->Fields('CHARACTER_OCTET_LENGTH'  )->{Value}; # CHAR_OCTET_LENGTH !!! MAX for *LONG*
-			$Fields[16] = $RecSet->Fields('ORDINAL_POSITION'        )->{Value}; # ORDINAL_POSITION
-			$Fields[17] = $IsNullable                                         ; # IS_NULLABLE !!!
+			$Fields[ 0] = $rs->Fields('TABLE_CATALOG'           )->{Value}; # TABLE_CAT
+			$Fields[ 1] = $rs->Fields('TABLE_SCHEMA'            )->{Value}; # TABLE_SCHEM
+			$Fields[ 2] = $rs->Fields('TABLE_NAME'              )->{Value}; # TABLE_NAME
+			$Fields[ 3] = $rs->Fields('COLUMN_NAME'             )->{Value}; # COLUMN_NAME
+			$Fields[ 4] = $SqlType[0]                                     ; # DATA_TYPE !!!
+			$Fields[ 5] = $TypeName                                       ; # TYPE_NAME !!!
+			$Fields[ 6] = $ColSize                                        ; # COLUMN_SIZE !!! MAX for *LONG*
+			$Fields[ 7] = $rs->Fields('CHARACTER_OCTET_LENGTH'  )->{Value}; # BUFFER_LENGTH !!! MAX for *LONG*, ... (e.g. num)
+			$Fields[ 8] = $rs->Fields('NUMERIC_SCALE'           )->{Value}; # DECIMAL_DIGITS ???
+			$Fields[ 9] = undef                                           ; # NUM_PREC_RADIX !!!
+			$Fields[10] = $rs->Fields('IS_NULLABLE'             )->{Value}; # NULLABLE !!!
+			$Fields[11] = $rs->Fields('DESCRIPTION'             )->{Value}; # REMARKS
+			$Fields[12] = $rs->Fields('COLUMN_DEFAULT'          )->{Value}; # COLUMN_DEF
+			$Fields[13] = $SqlType[1]                                     ; # SQL_DATA_TYPE !!!
+			$Fields[14] = $SqlType[2]                                     ; # SQL_DATETIME_SUB !!!
+			$Fields[15] = $rs->Fields('CHARACTER_OCTET_LENGTH'  )->{Value}; # CHAR_OCTET_LENGTH !!! MAX for *LONG*
+			$Fields[16] = $rs->Fields('ORDINAL_POSITION'        )->{Value}; # ORDINAL_POSITION
+			$Fields[17] = $IsNullable                                     ; # IS_NULLABLE !!!
 
 			push( @Rows, \@Fields );
-			$RecSet->MoveNext;
+			$rs->MoveNext;
 		}
-		$RecSet->Close; undef $RecSet;
+
+		$rs->Close; undef $rs;
 		$conn->{CursorLocation} = $tmpCursorLocation;
 
 		DBI->connect('dbi:Sponge:','','', { RaiseError => 1 })->prepare(
@@ -826,27 +813,27 @@ my $sch_dbi_to_ado = {
 		my $tmpCursorLocation = $conn->{CursorLocation};
 		$conn->{CursorLocation} = $ado_consts->{CursorLocationEnum}{adUseClient};
 
-		my $RecSet = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$QueryType}, \@Criteria );
+		my $rs = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$QueryType}, \@Criteria );
 		return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
 
-		$RecSet->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL';
+		$rs->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL';
 		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order ");
 
-		while ( ! $RecSet->{EOF} ) {
-			my $ado_fields = [ Win32::OLE::in($RecSet->Fields) ];
-			my @Fields = (map { $_->{Value} } Win32::OLE::in($RecSet->Fields) ) [ 0,1,2,3,6,7 ];
+		while ( !$rs->{EOF} ) {
+			my $ado_fields = [ Win32::OLE::in($rs->Fields) ];
+			my @Fields = (map { $_->{Value} } Win32::OLE::in($rs->Fields) ) [ 0,1,2,3,6,7 ];
 			push( @Rows, \@Fields );
-			$RecSet->MoveNext;
+			$rs->MoveNext;
 		}
 
-			$RecSet->Close; undef $RecSet;
-			$conn->{CursorLocation} = $tmpCursorLocation;
+		$rs->Close; undef $rs;
+		$conn->{CursorLocation} = $tmpCursorLocation;
 
-			DBI->connect('dbi:Sponge:','','', { RaiseError => 1 })->prepare(
-				$QueryType, { rows => \@Rows
-				, NAME => [ qw( TABLE_CAT TABLE_SCHEM TABLE_NAME COLUMN_NAME KEY_SEQ PK_NAME ) ]
-				, TYPE => [            12,         12,        12,         12,      5,     12   ]
-			});
+		DBI->connect('dbi:Sponge:','','', { RaiseError => 1 })->prepare(
+			$QueryType, { rows => \@Rows
+			, NAME => [ qw( TABLE_CAT TABLE_SCHEM TABLE_NAME COLUMN_NAME KEY_SEQ PK_NAME ) ]
+			, TYPE => [            12,         12,        12,         12,      5,     12   ]
+		});
 	}
 
 
@@ -866,21 +853,22 @@ my $sch_dbi_to_ado = {
 		my $tmpCursorLocation = $conn->{CursorLocation};
 		$conn->{CursorLocation} = $ado_consts->{CursorLocationEnum}{adUseClient};
 
-		my $RecSet = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$QueryType}, $Criteria );
+		my $rs = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$QueryType}, $Criteria );
 		return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
 
-		$RecSet->{Sort} = 'PK_TABLE_CATALOG, PK_TABLE_SCHEMA, PK_TABLE_NAME, FK_TABLE_CATALOG, FK_TABLE_SCHEMA, FK_TABLE_NAME';
+		$rs->{Sort} = 'PK_TABLE_CATALOG, PK_TABLE_SCHEMA, PK_TABLE_NAME, FK_TABLE_CATALOG, FK_TABLE_SCHEMA, FK_TABLE_NAME';
 		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order ");
 
-		while ( ! $RecSet->{EOF} ) {
-			my @Fields = (map { $_->{Value} } Win32::OLE::in($RecSet->Fields) ) [ 0..3,6..9,12..14,16,15,17 ];
+		while ( !$rs->{EOF} ) {
+			my @Fields = (map { $_->{Value} } Win32::OLE::in($rs->Fields) ) [ 0..3,6..9,12..14,16,15,17 ];
 			$Fields[ 9]  = $RefActions->{$Fields[ 9]};
 			$Fields[10]  = $RefActions->{$Fields[10]};
 			$Fields[13] += 4 if $Fields[13];
 			push( @Rows, \@Fields );
-			$RecSet->MoveNext;
+			$rs->MoveNext;
 		}
-		$RecSet->Close; undef $RecSet;
+
+		$rs->Close; undef $rs;
 		$conn->{CursorLocation} = $tmpCursorLocation;
 
 		DBI->connect('dbi:Sponge:','','', { RaiseError => 1 })->prepare(
@@ -932,7 +920,7 @@ my $sch_dbi_to_ado = {
 			rows=>   [ @{$dbh->{ado_all_types_supported}} ] , NAME=> $ado_info,
 		});
 
-		while(my $row = $sth->fetchrow_hashref) {
+		while ( my $row = $sth->fetchrow_hashref ) {
 			my @tyinfo;
 			# Only add items from the above names list.  When
 			# this list explans, the code 'should' still work.
@@ -1489,68 +1477,35 @@ my $sch_dbi_to_ado = {
 		return defined $rc ? $rc : -1;
 	}
 
-	sub fetchrow_arrayref {
-		my ($sth) = @_;
-		my $rs = $sth->{ado_rowset};
+  sub fetch {
+    my ($sth) = @_;
+    my $rs = $sth->{ado_rowset};
 
-		# return undef unless $sth->FETCH('Active');
-		return $sth->set_err( -900,"statement handle not marked as Active.") unless $sth->FETCH('Active');
+    return $sth->set_err( -900,'Statement handle not marked as Active.') unless $sth->FETCH('Active');
+    return $sth->set_err( -905,'Recordset undefined, execute statement not called?') unless $rs;
+    return if $rs->EOF;
 
-		return $sth->set_err( -905,"Recordset Undefined, execute statement not called?") unless $rs;
+    # required to not move from the current row until the next fetch is called.
+    # blob_read reads the next record without this check.
+    $rs->MoveNext if $sth->{ado_rownum} > 0;
+    return if $rs->{EOF};
+    return if DBD::ADO::Failed( $sth,'Fetch failed');
 
-		return undef if $rs->EOF;
-
-		# required to not move from the current row
-		# until the next fetch is called.  blob_read
-		# reads the next record without this check.
-		if ($sth->{ado_rownum} > 0) {
-			$rs->MoveNext;	# to check for errors and record for next itteration
-		}
-		return undef if $rs->{EOF};
-
-		return if DBD::ADO::Failed( $sth,"Fetch failed");
-
-		my $ado_fields = $sth->{ado_fields};
-
-		my $row =
-			[ map { $rs->Fields($_->{Name})->{Value} } @$ado_fields ];
+    my @row = map { $_->Value } Win32::OLE::in( $rs->Fields );
 		# Jan Dubois jand@activestate.com addition to handle changes
 		# in Win32::OLE return of Variant types of data.
-		foreach (@$row) {
+		for ( @row ) {
 			$_ = $_->As( Win32::OLE::Variant::VT_BSTR() )
 				if UNIVERSAL::isa($_, 'Win32::OLE::Variant');
 		}
-		if ($sth->FETCH('ChopBlanks')) {
-			map { $_ =~ s/\s+$//; } @$row;
-		}
+    map { s/\s+$// } @row if $sth->FETCH('ChopBlanks');
 
-		# Display the attributes for each row selected:
-		if(0) {
-			foreach my $field (map { $rs->Fields($_->{Name}) } @$ado_fields) {
-				print "Name        : ", $field->Name, "\n";
-				print "--------------", "\n";
-				print "ActualSize  : ", $field->ActualSize, "\n";
-				print "Attributes  : ", $field->Attributes, "\n";
-				print "        Long: ", $field->Attributes & $ado_consts->{FieldAttributeEnum}{adFldLong}? 1 : 0 , "\n";
-				print "        Null: ", $field->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayBeNull}? 1 : 0 , "\n";
-				print "       Defer: ", $field->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayDefer}? 1 : 0 , "\n";
-				print "       Fixed: ", $field->Attributes & $ado_consts->{FieldAttributeEnum}{adFldFixed}? 1 : 0 , "\n";
-				print "         Key: ", $field->Attributes & $ado_consts->{FieldAttributeEnum}{adFldKeyColumn}? 1 : 0 , "\n";
-				# print "DataFormat  : ", $field->DataFormat, "\n";
-				print "DefinedSize : ", $field->DefinedSize, "\n";
-				print "NumericScale: ", $field->NumericScale, "\n";
-				print "Precision   : ", $field->Precision, "\n";
-				print "Status      : ", $field->Status, "\n";
-				print "Type        : ", $field->Type, "\n";
-				print "\n";
-			}
-		}
-		$sth->{ado_rownum}++;
-		$sth->{ado_rows} = $sth->{ado_rownum};
-		return $sth->_set_fbav($row);
+    $sth->{ado_rownum}++;
+    $sth->{ado_rows} = $sth->{ado_rownum};
+    return $sth->_set_fbav( \@row );
   }
 
-  *fetch = \&fetchrow_arrayref;
+  *fetchrow_arrayref = \&fetch;
 
 	sub finish {
 		my ($sth) = @_;
@@ -1636,6 +1591,24 @@ DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
 The DBD::ADO module supports ADO access on a Win32 machine.
 DBD::ADO is written to support the standard DBI interface to
 data sources.
+
+
+=head1 PREREQUISITES
+
+=over
+
+=item DBI
+
+=item Win32::OLE
+
+=item ADO
+
+It is strongly recommended that you use the latest version of ADO
+(2.1 at the time this was written). You can download it from:
+
+  http://www.microsoft.com/Data/download.htm
+
+=back
 
 
 =head1 Connection
@@ -1954,13 +1927,6 @@ hash may not be the "best" solution for the data type.
 adSchemaProviderTypes does provide for a "best match" column, however
 the MS OLE DB -> ODBC provider does not support the best match.
 Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
-
-=head1 ADO
-
-It is strongly recommended that you use the latest version of ADO
-(2.1 at the time this was written). You can download it from:
-
-  http://www.microsoft.com/Data/download.htm
 
 
 =head1 AUTHORS

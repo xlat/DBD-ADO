@@ -3,12 +3,6 @@ Adjust return codes wrt the spec
 
 Change tests to use bind_param() more often.
 
-sub fetchrow_arrayref:
-  if UNIVERSAL::isa($_, 'Win32::OLE::Variant') => drop?
-  $_->As( Win32::OLE::Variant::VT_BSTR() => still Win32::OLE::Variant?
-  $rs->Fields($_->{Name})->{Value} => in() ?
-    see max(id), min(id)
-
 
 ParamValues: What's the reason for the following problem?
 
