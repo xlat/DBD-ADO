@@ -1,3 +1,11 @@
+2003-12-14  2.83
+
+  Added notes about Unicode support thanks to Stefan Ram and Jan Dubois.
+
+  Rearranged some tests.
+
+  Installed ADO-specific method ado_open_schema().
+
 2003-12-07  2.82
 
   Replaced duplicated code in DESTROY() with a call to disconnect().

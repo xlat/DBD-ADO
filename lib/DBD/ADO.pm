@@ -1,6 +1,3 @@
-#!perl
-# vim:ts=2:sw=2:ai:aw:nu
-
 {
   package DBD::ADO;
 
@@ -9,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state);
 
-  $VERSION = '2.82';
+  $VERSION = '2.83';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    = 0;      # The $DBI::err value
@@ -28,6 +25,9 @@
 			'Errstr' 			=> \$DBD::ADO::errstr,
 			'State' 			=> \$DBD::ADO::state,
     });
+    if ( $DBI::VERSION >= 1.37 ) {
+      DBD::ADO::db->install_method('ado_open_schema');
+    }
     return $drh;
   }
 
@@ -273,35 +273,6 @@ my $sch_dbi_to_ado = {
 
   my $ado_consts = DBD::ADO::Const->Enums;
 
-	# Rollback to the database.
-	sub rollback {
-		my($dbh) = @_;
-
-		return Carp::carp "Rollback ineffective when AutoCommit is on\n"
-			if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
-		return Carp::carp $dbh->{ado_provider_auto_commit_comments}
-			unless $dbh->{ado_provider_support_auto_commit};
-    if ( $dbh->FETCH('BegunWork') ) {
-      $dbh->{AutoCommit} = 1;
-      $dbh->SUPER::STORE('BegunWork', 0 );
-      my $conn = $dbh->{ado_conn};
-      $conn->{Attributes} = 0;
-      my $lastError = DBD::ADO::errors($conn);
-      return $dbh->set_err( $DBD::ADO::err || -1,
-        "Failed setting CommitRetaining: $lastError")
-      if $lastError;
-    }
-		if (exists $dbh->{ado_conn} and defined $dbh->{ado_conn} and
-			$dbh->{ado_conn}->{State} & $ado_consts->{ObjectStateEnum}{adStateOpen}) {
-			$dbh->{ado_conn}->RollbackTrans;
-			my $lastError = DBD::ADO::errors($dbh->{ado_conn});
-			return $dbh->set_err( $DBD::ADO::err || -1,
-				"Failed to Rollback Trans: $lastError")
-			if $lastError;
-		}
-    return 1;
-	}
-
   sub ping {
     my ( $dbh ) = @_;
     my $conn = $dbh->{ado_conn};
@@ -367,6 +338,35 @@ my $sch_dbi_to_ado = {
 			my $lastError = DBD::ADO::errors($dbh->{ado_conn});
 			return $dbh->set_err( $DBD::ADO::err || -1, "Failed to CommitTrans: $lastError")
 				if $lastError;
+		}
+    return 1;
+	}
+
+	# Rollback to the database.
+	sub rollback {
+		my($dbh) = @_;
+
+		return Carp::carp "Rollback ineffective when AutoCommit is on\n"
+			if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
+		return Carp::carp $dbh->{ado_provider_auto_commit_comments}
+			unless $dbh->{ado_provider_support_auto_commit};
+    if ( $dbh->FETCH('BegunWork') ) {
+      $dbh->{AutoCommit} = 1;
+      $dbh->SUPER::STORE('BegunWork', 0 );
+      my $conn = $dbh->{ado_conn};
+      $conn->{Attributes} = 0;
+      my $lastError = DBD::ADO::errors($conn);
+      return $dbh->set_err( $DBD::ADO::err || -1,
+        "Failed setting CommitRetaining: $lastError")
+      if $lastError;
+    }
+		if (exists $dbh->{ado_conn} and defined $dbh->{ado_conn} and
+			$dbh->{ado_conn}->{State} & $ado_consts->{ObjectStateEnum}{adStateOpen}) {
+			$dbh->{ado_conn}->RollbackTrans;
+			my $lastError = DBD::ADO::errors($dbh->{ado_conn});
+			return $dbh->set_err( $DBD::ADO::err || -1,
+				"Failed to Rollback Trans: $lastError")
+			if $lastError;
 		}
     return 1;
 	}
@@ -995,7 +995,7 @@ my $sch_dbi_to_ado = {
 				Carp::croak "_determine_type_support failed: ", $dbh->{errstr};
 		}
 
-		my $ops = _open_schema($dbh, 'adSchemaProviderTypes' );
+		my $ops = ado_open_schema( $dbh,'adSchemaProviderTypes');
 		Carp::croak "ops undefined!" unless defined $ops;
 
 		my $ado_info		= [ @{$ops->{NAME}} ];
@@ -1207,37 +1207,26 @@ my $sch_dbi_to_ado = {
 		$dbh->{ado_type_info_hash}{$AdoType}{$IsFixed}{$IsLong} || [];
 	}
 
-	sub OpenSchema {
-		my ($dbh) = @_;
-		return &_open_schema;
-	}
 
-	sub _open_schema {
-		my ($dbh, $var, @crit) = @_;
-		# my ($dbh, $var) = @_;
+  sub ado_open_schema {
+    my ($dbh, $var, @crit) = @_;
 
-		$dbh->trace_msg( "-> _open_schema\n" );
-		Carp::croak qq{_open_schema called with dbh defined} unless $dbh;
+    unless ( exists $ado_consts->{SchemaEnum}{$var} ) {
+      return $dbh->set_err( $DBD::ADO::err || -1,
+        "OpenSchema called with unknown parameter: $var");
+    }
+    my $crit = \@crit if @crit;  # XXX: o.k.?
+    my $conn = $dbh->{ado_conn};
+    my $rs   = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$var}, $crit );
+    my $lastError = DBD::ADO::errors($conn);
+    return $dbh->set_err( $DBD::ADO::err || -1,
+      "OpenSchema error: $lastError")
+    if $lastError;
 
-		unless (exists $ado_consts->{SchemaEnum}{$var}) {
-			return $dbh->set_err( $DBD::ADO::err || -1,
-				"OpenSchema called with unknown parameter: $var");
-		}
-		my $crit = \@crit if @crit;
-		my $conn = $dbh->{ado_conn};
-		my $oLRec =
-#			$conn->OpenSchema($ado_consts->{SchemaEnum}{$var});
-			$conn->OpenSchema($ado_consts->{SchemaEnum}{$var}, $crit);
-		my $lastError = DBD::ADO::errors($conn);
-		return $dbh->set_err( $DBD::ADO::err || -1, "OpenSchema error: : $lastError")
-			if $lastError;
+    return _rs_sth_prepare( $dbh, $rs );
+  }
 
-		my $sth = _rs_sth_prepare( $dbh, $oLRec );
-
-		$dbh->trace_msg( "<- _open_schema\n" );
-
-		return $sth;
-	} # _open_schema
+  *OpenSchema = \&ado_open_schema;
 
 
 	sub FETCH {
@@ -1879,24 +1868,36 @@ B<Warning:> The application is responsible for passing the correct
 information when setting any of these attributes.
 
 
-=head1 Functions support
+=head1 ADO-specific methods
 
-The DBI func() method can be used to call private methods implemented by the
-driver:
+=head2 ado_open_schema
 
-  $h->func( @func_arguments, $func_name ) or die ...;
+  $sth = $dbh->ado_open_schema( $QueryType, @Criteria ) or die ...;
 
-You may access the following database handle methods:
+This method can be used to obtain database schema information from the
+provider.
+It returns a valid statement handle upon success.
 
-  OpenSchema
-
-All functions return a valid statement handle upon success.
-
-OpenSchema supports as arguments any valid ADO SchemaEnum name such as
+C<$QueryType> may be any valid ADO SchemaEnum name such as
 
   adSchemaTables
   adSchemaIndexes
   adSchemaProviderTypes
+
+C<@Criteria> (optional) is a list of query constraints depending on each
+C<$QueryType>.
+
+Example:
+
+  my $sth = $dbh->ado_open_schema('adSchemaCheckConstraints','Catalog1');
+
+B<Note:> With DBI version 1.36 and earlier, the func() method has to be used
+to call private methods implemented by the driver:
+
+  $h->func( @func_arguments, $func_name ) or die ...;
+
+where C<$func_name> is 'ado_open_schema'.
+You can use 'OpenSchema' for backward compatibility.
 
 Example:
 
@@ -2074,7 +2075,24 @@ Accepts any of the attributes described in the L<table_info> method:
   @names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
 
 
-=head1 Warnings
+=head1 CAVEATS
+
+=head2 Character set
+
+Proper Unicode support depends on all components involved in your
+application: the DBMS, the ADO provider, Perl and some perl modules.
+
+In short: Perl 5.8 and Win32::OLE 0.16 (or later) are strongly
+recommended and Win32::OLE has to be prepared to use the correct
+codepage:
+
+  Win32::OLE->Option( CP => Win32::OLE::CP_UTF8 );
+
+More detailed notes can be found at
+
+  http://purl.net/stefan_ram/pub/perl_unicode_en
+
+=head2 Type info
 
 Support for type_info_all is supported, however, you're not using
 a true OLE DB provider (using the MS OLE DB -> ODBC), the first

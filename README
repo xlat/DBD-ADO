@@ -49,30 +49,42 @@ Connection
   information when setting any of these attributes.
 
 
-Functions support
+ADO-specific methods
 
-  The DBI func() method can be used to call private methods implemented by the
-  driver:
+  ado_open_schema
 
-    $h->func( @func_arguments, $func_name ) or die ...;
+      $sth = $dbh->ado_open_schema( $QueryType, @Criteria ) or die ...;
 
-  You may access the following database handle methods:
+    This method can be used to obtain database schema information from the
+    provider.
+    It returns a valid statement handle upon success.
 
-    OpenSchema
+    $QueryType may be any valid ADO SchemaEnum name such as
 
-  All functions return a valid statement handle upon success.
+      adSchemaTables
+      adSchemaIndexes
+      adSchemaProviderTypes
 
-  OpenSchema supports as arguments any valid ADO SchemaEnum name such as
+    @Criteria (optional) is a list of query constraints depending on each
+    $QueryType.
 
-    adSchemaTables
-    adSchemaIndexes
-    adSchemaProviderTypes
+    Example:
 
-  Example:
+      my $sth = $dbh->ado_open_schema('adSchemaCheckConstraints','Catalog1');
 
-    my $sth = $dbh->func('adSchemaCheckConstraints','Catalog1','OpenSchema');
+    Note: With DBI version 1.36 and earlier, the func() method has to be used
+    to call private methods implemented by the driver:
 
-  See ex/OpenSchema.pl for a working example.
+      $h->func( @func_arguments, $func_name ) or die ...;
+
+    where $func_name is 'ado_open_schema'.
+    You can use 'OpenSchema' for backward compatibility.
+
+    Example:
+
+      my $sth = $dbh->func('adSchemaCheckConstraints','Catalog1','OpenSchema');
+
+    See ex/OpenSchema.pl for a working example.
 
 
 DBI Methods
@@ -163,62 +175,62 @@ Enhanced DBI Methods
 
     Warning: This method is experimental and may change or disappear.
 
-            $sth = $dbh->table_info(\%attr);
+      $sth = $dbh->table_info(\%attr);
 
-            $sth = $dbh->table_info({
-                    TABLE_TYPE => 'VIEW',
-                    ADO_Columns => 1,
-                    Trim_Catalog => 0,
-                    Filter => q{TABLE_NAME LIKE 'C%'},
-            });
+      $sth = $dbh->table_info({
+              TABLE_TYPE => 'VIEW',
+              ADO_Columns => 1,
+              Trim_Catalog => 0,
+              Filter => q{TABLE_NAME LIKE 'C%'},
+      });
 
     Returns an active statement handle that can be used to fetch information
     about tables and views that exist in the database. By default the handle
     contains the columns described in the DBI documentation:
 
-            TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
+      TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
 
     ADO_Columns
     Additional ADO-only fields will be included if the ADO_Columns attribute
     is set to true:
 
-            %attr = (ADO_Columns => 1);
+      %attr = (ADO_Columns => 1);
 
     Trim_Catalog
     Some ADO providers include path info in the TABLE_CAT column. This
     information will be trimmed if the Trim_Catalog attribute is set to
     true:
 
-            %attr = (Trim_Catalog => 1);
+      %attr = (Trim_Catalog => 1);
 
     Criteria
     The ADO driver allows column criteria to be specified. In this way the
     record set can be restricted, for example, to only include tables of
     type 'VIEW':
 
-            %attr = (TABLE_TYPE => 'VIEW')
+      %attr = (TABLE_TYPE => 'VIEW')
 
     You can add criteria for any of the following columns:
 
-            TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE
+      TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE
 
     Filter
     The ADO driver also allows the recordset to be filtered on a Criteria
     string: a string made up of one or more individual clauses concatenated
     with AND or OR operators.
 
-            %attr = (Filter => q{TABLE_TYPE LIKE 'SYSTEM%'})
+      %attr = (Filter => q{TABLE_TYPE LIKE 'SYSTEM%'})
 
     The criteria string is made up of clauses in the form
     FieldName-Operator-Value. This is more flexible than using column
     criteria in that the filter allows a number of operators:
 
-            <, >, <=, >=, <>, =, or LIKE
+      <, >, <=, >=, <>, =, or LIKE
 
     The Fieldname must be one of the ADO 'TABLES Rowset' column names:
 
-            TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION,
-            TABLE_GUID, TABLE_PROPID, DATE_CREATED, DATE_MODIFIED
+      TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION,
+      TABLE_GUID, TABLE_PROPID, DATE_CREATED, DATE_MODIFIED
 
     Value is the value with which you will compare the field values (for
     example, 'Smith', #8/24/95#, 12.345, or $50.00). Use single quotes with
@@ -232,21 +244,38 @@ Enhanced DBI Methods
 
     Warning: This method is experimental and may change or disappear.
 
-            @names = $dbh->tables(\%attr);
+      @names = $dbh->tables(\%attr);
 
     Returns a list of table and view names. Accepts any of the attributes
     described in the the table_info manpage method:
 
-            @names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
+      @names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
 
-Warnings
+CAVEATS
 
-  Support for type_info_all is supported, however, you're not using
-  a true OLE DB provider (using the MS OLE DB -> ODBC), the first
-  hash may not be the "best" solution for the data type.
-  adSchemaProviderTypes does provide for a "best match" column, however
-  the MS OLE DB -> ODBC provider does not support the best match.
-  Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
+  Character set
+
+    Proper Unicode support depends on all components involved in your
+    application: the DBMS, the ADO provider, Perl and some perl modules.
+
+    In short: Perl 5.8 and Win32::OLE 0.16 (or later) are strongly
+    recommended and Win32::OLE has to be prepared to use the correct
+    codepage:
+
+      Win32::OLE->Option( CP => Win32::OLE::CP_UTF8 );
+
+    More detailed notes can be found at
+
+      http://purl.net/stefan_ram/pub/perl_unicode_en
+
+  Type info
+
+    Support for type_info_all is supported, however, you're not using
+    a true OLE DB provider (using the MS OLE DB -> ODBC), the first
+    hash may not be the "best" solution for the data type.
+    adSchemaProviderTypes does provide for a "best match" column, however
+    the MS OLE DB -> ODBC provider does not support the best match.
+    Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
 
 ADO
 

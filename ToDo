@@ -1,6 +1,4 @@
 
-install_method('ado_open_schema')
-
 Adjust return codes wrt the spec
 
 Change tests to use bind_param() more often.
