@@ -1,75 +1,3 @@
-
-Changes Version 2.72: 2003-09-03
-
-	Moved DBD::ADO::TypeInfo from DBD/ADO.pm to DBD/ADO/TypeInfo.pm.
-
-	Fixed number of tests at t\15func.t.
-
-	Fixed warning 'Use of uninitialized value in string eq at
-	t\02simple.t line 54'.
-
-Changes Version 2.71: 2003-08-31
-
-	New maintainer: Steffen Goeldner <sgoeldner@cpan.org>.
-
-Changes Version 2.7: Thu Aug 21 23:10:50 EDT 2003
-
-	Bug fix from Yimin Zheng regarding undef/null values passed as
-	parameters to bind_param and/or execute
-	Thanks Yimin.
-	
-	Enhancement to Meta Data support from Steffen Goeldner.
-	Thanks Steffen.
-
-	Modified all tests to skip if DBI_DSN is not defined.  This should
-	allow the automatic CPAN build at ActiveState to create a PPM for
-	DBD::ADO
-
-	Did minor clean up in the test and warning messages for uninitialized
-	values.
-
-Changes Version 2.6:  So what happened to the notes for 2.6?
-
-
-Changes Version 2.5: Mon  Apr 8, 2002  23:00:39
-
-	Bug fix from Jacqui Caren <jacqui.caren@ig.co.uk>, apply to bind image.
-	
-	Meta Data support from Steffen Goeldner.
-		Includes: 
-			get_info
-			Improved table_info
-			column_info
-			primary_key_info
-			foreign_key_info
-			Improved ADO to ODBC type conversions.
-
-	package DBD::ADO::TypeInfo from Steffen Goeldner, however 
-	none of the current code is using this package, yet.
-
-	Remove temp constants needed until DBI support SQL_* values.
-
-	Added more tests.  
-
-Changes Version 2.4: Tue Oct 23 23:25:42 EDT 2001
-	Patch for supporting primary_key_info from Steffen Goeldner <s.goeldner@eurodata.de>
-		Thanks Steffen!
-	Bug in function call to openschema from Steffen Goeldner <s.goeldner@eurodata.de>
-		Thanks Steffen!
-	Added support for CursorType.
-	Fixed error messages to return more meaningful numbers.
-	Fixed Nullable attribute.
-	Added more documentation.
-	Modified most of the tests to use Test::More.
-
-Changes Version 2.1: Sat May 26 07:51:19 EDT 2001
-	First CPAN release apart from DBI.
-	Version number correction.
-	Patch from Simon Oliver:  Warning messages from undefined values.
-
-New maintainer: Thomas Lowery tlowery@stlowery.com
-When emailing, make sure to include ADO in the subject line.
-
 NAME
     DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
 
@@ -267,7 +195,7 @@ ADO
       http://www.microsoft.com/Data/download.htm
 
 AUTHORS
-    Phlip and Tim Bunce. With many thanks to Jan Dubois and Jochen Wiedmann
+    Tim Bunce and Phlip. With many thanks to Jan Dubois and Jochen Wiedmann
     for additions, debuggery and general help.
     Special thanks to Thomas Lowery, who maintained this module 2001-2003.
     Current maintainer is Steffen Goeldner.

@@ -6,21 +6,21 @@
 
     require DBI;
     require Carp;
-		use strict;
-		use vars qw($err $errstr $state $drh $VERSION @EXPORT);
+    use strict;
+    use vars qw($err $errstr $state $drh $VERSION @EXPORT);
 
     @EXPORT = ();
-    $VERSION = '2.72';
+    $VERSION = '2.73';
 
+# Copyright (c) 1998, Tim Bunce
+# Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
+# Copyright (c) 2000, Tim Bunce, Phlip, Thomas Lowery
+# Copyright (c) 2001, Tim Bunce, Phlip, Thomas Lowery, Steffen Goeldner
+# Copyright (c) 2002, Tim Bunce, Phlip, Thomas Lowery, Steffen Goeldner
+# Copyright (c) 2003, Tim Bunce, Phlip, Thomas Lowery, Steffen Goeldner
 #
-#   Copyright (c) 1999, Phlip & Tim Bunce
-#   Copyright (c) 2000, Phlip & Tim Bunce, and Thomas Lowery
-#   Copyright (c) 2001, Philp & Tim Bunce, and Thomas Lowery
-#   Copyright (c) 2002, Philp & Tim Bunce, and Thomas Lowery
-#   Copyright (c) 2003, Philp & Tim Bunce, Thomas Lowery and Steffen Goeldner
-#
-#   You may distribute under the terms of either the GNU General Public
-#   License or the Artistic License, as specified in the Perl README file.
+# You may distribute under the terms of either the GNU General Public
+# License or the Artistic License, as specified in the Perl README file.
 
     $drh = undef;       # holds driver handle once initialised
     $err = 0;           # The $DBI::err value
@@ -34,7 +34,7 @@
         ($drh) = DBI::_new_drh($class, {
             'Name' 				=> 'ADO',
             'Version' 		=> $VERSION,
-            'Attribution' => 'DBD ADO for Win32 by Phlip, Tim Bunce, Thomas Lowery and Steffen Goeldner',
+            'Attribution' => 'DBD ADO for Win32 by Tim Bunce, Phlip, Thomas Lowery and Steffen Goeldner',
 						'Err' 				=> \$DBD::ADO::err,
 						'Errstr' 			=> \$DBD::ADO::errstr,
 						'State' 			=> \$DBD::ADO::state,
@@ -79,7 +79,7 @@
 
 			if ($Errors) {
 				# $DBD::ADO::state = $Errors->SQLState();
-				$Errors->Clear 
+				$Errors->Clear
 			}
 
 			$Conn->Errors->Clear() if $Conn;
@@ -206,8 +206,8 @@ my %connect_options;
 				Warn => 0,
 				LongReadLen => 0,
 				LongTruncOk => 0,
-			}, 
-			{ 
+			},
+			{
 				  ado_consts							=> undef
 				, ado_conn								=> undef
 				, ado_types_supported			=> undef
@@ -234,7 +234,7 @@ my %connect_options;
 	$conn->{CommandTimeout} = \$this->{ado_commandtimeout};
 
 	$this->{ado_conn} = $conn;
-	$drh->trace_msg( "->ADO Connection: " . ref $this->{ado_conn} . 
+	$drh->trace_msg( "->ADO Connection: " . ref $this->{ado_conn} .
 		" Connection: " . ref $conn . "\n", 1);
 	##  ODBC rule - Null is not the same as an empty password...
 	$auth = '' if !defined $auth;
@@ -250,7 +250,7 @@ my %connect_options;
 						$this->STORE($c, $v);
 						$drh->trace_msg("->> Storing $c $v\n", 1);
 						next;
-					} 
+					}
 			}
 		push(@cdsn, $s );
 		}
@@ -267,7 +267,7 @@ my %connect_options;
 	$drh->trace_msg("->> Open ADO connection using $cdsn\n", 1);
 	$conn->Open ($cdsn, $user, $auth);
 	$lastError = DBD::ADO::errors($conn);
-	return DBI::set_err( $drh, $DBD::ADO::err, 
+	return DBI::set_err( $drh, $DBD::ADO::err,
 		  "Can't connect to '$dsn': $lastError")
 	    if $lastError;
 
@@ -278,7 +278,7 @@ my %connect_options;
 
 	$conn->{Attributes} = $att;
 	$lastError = DBD::ADO::errors($conn);
-	return DBI::set_err( $conn, $DBD::ADO::err, 
+	return DBI::set_err( $conn, $DBD::ADO::err,
 			"Failed setting CommitRetaining: $lastError")
 		if $lastError;
 
@@ -288,30 +288,30 @@ my %connect_options;
 		$auto = $conn->Properties->{qq{Transaction DDL}}->{Value};
 	if ( $auto eq &DBPROPVAL_TC_ALL ) {
 		$this->{ado_provider_support_auto_commit} = $auto;
-		$this->{ado_provider_auto_commit_comments} = 
+		$this->{ado_provider_auto_commit_comments} =
 			qq{Transactions can contain DDL and DML statements in any order.};
 	} elsif ( $auto eq &DBPROPVAL_TC_DDL_COMMIT ) {
 		$this->{ado_provider_support_auto_commit} = $auto;
-		$this->{ado_provider_auto_commit_comments} = 
+		$this->{ado_provider_auto_commit_comments} =
 			qq{Transactions can contain DML statements.  DDL statements within a transaction cause the transaction to be committed.};
 	} elsif ( $auto eq &DBPROPVAL_TC_DDL_IGNORE )  {
 		$this->{ado_provider_support_auto_commit} = $auto;
-		$this->{ado_provider_auto_commit_comments} = 
+		$this->{ado_provider_auto_commit_comments} =
 			qq{Transactions can only contain DML statements.  DDL statements within a transaction are ignored.};
 	} elsif ( $auto eq &DBPROPVAL_TC_DML )  {
 		$this->{ado_provider_support_auto_commit} = $auto;
-		$this->{ado_provider_auto_commit_comments} = 
+		$this->{ado_provider_auto_commit_comments} =
 			qq{Transactions can only contain Data Manipulation (DML) statements.  DDL statements within a trnsaction cause an error.};
 	} else {
 		$this->{ado_provider_support_auto_commit} = $auto;
-		$this->{ado_provider_auto_commit_comments} = 
+		$this->{ado_provider_auto_commit_comments} =
 			qq{Transactions are not supported.};
 	}
 	};
 	if ($@) {
 		warn "No transactions";
 		$this->{ado_provider_support_auto_commit} = 0;
-		$this->{ado_provider_auto_commit_comments} = 
+		$this->{ado_provider_auto_commit_comments} =
 			qq{Transactions are not supported.};
 		$auto = 0;
 		$lastError = DBD::ADO::errors($conn);
@@ -323,7 +323,7 @@ my %connect_options;
  	if ($auto) {
 		$conn->BeginTrans;
 		$lastError = DBD::ADO::errors($conn);
-		return DBI::set_err( $this, $DBD::ADO::err, 
+		return DBI::set_err( $this, $DBD::ADO::err,
 			"Begin Transaction Failed: $lastError")
 		if $lastError;
 	}
@@ -347,12 +347,12 @@ my %connect_options;
 			my $conn = $self->{ado_conn};
 			my $auto = $self->{AutoCommit};
 			if (defined $conn) {
-				$conn->CommitTrans if $auto 
+				$conn->CommitTrans if $auto
 					and $self->{ado_provider_support_auto_commit};
-				$conn->RollbackTrans unless $auto 
+				$conn->RollbackTrans unless $auto
 					and not $self->{ado_provider_support_auto_commit};
 			my $lastError = DBD::ADO::errors($conn);
-			return DBI::set_err( $self, $DBD::ADO::err, "Failed to Destory: $lastError") 
+			return DBI::set_err( $self, $DBD::ADO::err, "Failed to Destory: $lastError")
 				if $lastError;
 			}
 		}
@@ -372,12 +372,12 @@ my %connect_options;
 # Information returned from the provider about the schema.  The column names
 # are different then the DBI spec.
 my $ado_schematables = [
-	qw{ TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS 
+	qw{ TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS
 		TABLE_GUID TABLE_PROPID DATE_CREATED DATE_MODIFIED
 	} ];
 
 my $ado_dbi_schematables = [
-	qw{ TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS } 
+	qw{ TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS }
 	];
 
 my $sch_dbi_to_ado = {
@@ -389,9 +389,9 @@ my $sch_dbi_to_ado = {
 	TABLE_GUID    => 'TABLE_GUID',
 	TABLE_PROPID  => 'TABLE_PROPID',
 	DATE_CREATED  => 'DATE_CREATED',
-	DATE_MODIFIED => 'DATE_MODIFIED', 
+	DATE_MODIFIED => 'DATE_MODIFIED',
 	};
-	
+
 my @sql_types_supported = ();
 
 {   package DBD::ADO::db; # ====== DATABASE ======
@@ -409,14 +409,14 @@ my @sql_types_supported = ();
 
 			return carp "Rollback ineffective when AutoCommit is on\n"
 				if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
-			return carp $dbh->{ado_provider_auto_commit_comments} 
+			return carp $dbh->{ado_provider_auto_commit_comments}
 				unless $dbh->{ado_provider_support_auto_commit};
 			if (exists $dbh->{ado_conn} and defined $dbh->{ado_conn} and
 				$dbh->{ado_conn}->{State} & $ado_consts->{adStateOpen}) {
 					$dbh->{ado_conn}->RollbackTrans;
 					my $lastError = DBD::ADO::errors($dbh->{ado_conn});
 					return DBI::set_err( $dbh, $DBD::ADO::err,
-						"Failed to Rollback Trans: $lastError") 
+						"Failed to Rollback Trans: $lastError")
 					if $lastError;
 			}
 		}
@@ -433,13 +433,13 @@ my @sql_types_supported = ();
 				# does not start another transaction.
 				$conn->{Attributes} = 0;
 				my $lastError = DBD::ADO::errors($conn);
-				return DBI::set_err( $conn, $DBD::ADO::err, 
+				return DBI::set_err( $conn, $DBD::ADO::err,
 						"Failed setting CommitRetaining: $lastError") #-2147168242
 				if $lastError and $lastError !~ m/-2147168242/;
 
 				$dbh->trace_msg( "<- modified connection Attributes " . $conn->{Attributes} . "\n");
 				$dbh->trace_msg( "<- AutoCommit -> $auto  Provider Support -> $dbh->{ado_provider_support_auto_commit} Comments -> $dbh->{ado_provider_auto_commit_comments}\n");
-		$dbh->{ado_provider_auto_commit_comments} = 
+		$dbh->{ado_provider_auto_commit_comments} =
 				$conn->CommitTrans if $auto and
 					$dbh->{ado_provider_support_auto_commit};
 
@@ -447,9 +447,9 @@ my @sql_types_supported = ();
 					not $dbh->{ado_provider_support_auto_commit};
 
 				$lastError = DBD::ADO::errors($conn);
-				return $dbh->DBI::set_err( $DBD::ADO::err, "Failed to execute rollback: $lastError") 
+				return $dbh->DBI::set_err( $DBD::ADO::err, "Failed to execute rollback: $lastError")
 					if $lastError and $lastError !~ m/-2147168242/;
-				# Provider error about transaction not started.  Ignore message, 
+				# Provider error about transaction not started.  Ignore message,
 				# clear error codes.
 				DBD::ADO::errors($conn) if ($lastError and $lastError =~ m/-2147168242/);
 
@@ -469,19 +469,19 @@ my @sql_types_supported = ();
 
 			return warn "Commit ineffective when AutoCommit is on\n"
 				if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
-			return carp $dbh->{ado_provider_auto_commit_comments} 
+			return carp $dbh->{ado_provider_auto_commit_comments}
 				unless $dbh->{ado_provider_support_auto_commit};
 			if (exists $dbh->{ado_conn} and defined $dbh->{ado_conn} and
 				$dbh->{ado_conn}->{State} == $ado_consts->{adStateOpen}) {
 
 				$dbh->{ado_conn}->CommitTrans;
 				my $lastError = DBD::ADO::errors($dbh->{ado_conn});
-				return DBI::set_err( $dbh, $DBD::ADO::err, "Failed to CommitTrans: $lastError") 
+				return DBI::set_err( $dbh, $DBD::ADO::err, "Failed to CommitTrans: $lastError")
 					if $lastError;
 			}
 		}
 
-		# The create parm methods builds a usable type statement for constructing 
+		# The create parm methods builds a usable type statement for constructing
 		# tables.
 		# XXX This method may not stay ...
 		sub create_parm {
@@ -492,9 +492,9 @@ my @sql_types_supported = ();
 			if ($type) {
 	    	$field = $type->{TYPE_NAME};
 				if (defined $type->{CREATE_PARAMS}) {
-				$field .= qq{(} . $type->{COLUMN_SIZE} . qq{)} 
+				$field .= qq{(} . $type->{COLUMN_SIZE} . qq{)}
 					if ($type->{CREATE_PARAMS} =~ /LENGTH/i);
-				$field .= qq{(} . $type->{COLUMN_SIZE} . qq{, 0)} 
+				$field .= qq{(} . $type->{COLUMN_SIZE} . qq{, 0)}
 					if ($type->{CREATE_PARAMS} =~ /PRECISION,SCALE/i);
 				}
 			}
@@ -534,8 +534,8 @@ my @sql_types_supported = ();
 				"Unable to set command type 'ADODB.Command': $lastError")
 	    if $lastError;
 
-			my ($outer, $sth) = $dbh->DBI::_new_sth( { 
-						 Statement   	=> $statement 
+			my ($outer, $sth) = $dbh->DBI::_new_sth( {
+						 Statement   	=> $statement
 						,NAME					=> undef
 						,TYPE					=> undef
 						,PRECISION		=> undef
@@ -584,7 +584,7 @@ my @sql_types_supported = ();
 			$sth->{ado_users}		= undef;
 
 			# Inherit from dbh.
-			$sth->{ado_commandtimeout} = 
+			$sth->{ado_commandtimeout} =
 				defined $dbh->{ado_commandtimeout} ?  $dbh->{ado_commandtimeout} :
 					$conn->{CommandTimeout};
 
@@ -594,7 +594,7 @@ my @sql_types_supported = ();
 				"Unable to set CommandText 'ADODB.Command': $lastError")
 	    if $lastError;
 
-			$sth->{ado_cursortype} = 
+			$sth->{ado_cursortype} =
 				defined $dbh->{ado_cursortype} ?  $dbh->{ado_cursortype} : undef;
 
 			# Set overrides for and attributes.
@@ -618,26 +618,26 @@ my @sql_types_supported = ();
 				};
 				 $sth->{ado_refresh} = 0 if $@;
 			}
-	
+
 			if ($sth->{ado_refresh} == 0) {
 				$outer->STORE( 'NUM_OF_PARAMS', _params($statement));
 				my $params = $sth->FETCH( 'NUM_OF_PARAMS');
 				if ($params > 0) {
 					for ( 0 .. ($params - 1)) {
-						my $parm = 
+						my $parm =
 							$comm->CreateParameter("$_",
 								$ado_consts->{adVarChar},
 								$ado_consts->{adParamInput},
 								1,
 								"");
 						my $lastError = DBD::ADO::errors($conn);
-						return $sth->DBI::set_err( $DBD::ADO::err, 
+						return $sth->DBI::set_err( $DBD::ADO::err,
 		  				"Unable to CreateParameter: $lastError")
 	    			if $lastError;
 
 						$comm->Parameters->Append($parm);
 						$lastError = DBD::ADO::errors($conn);
-						return $sth->DBI::set_err( $DBD::ADO::err, 
+						return $sth->DBI::set_err( $DBD::ADO::err,
 		  				"Append parameter failed : $lastError")
 	    			if $lastError;
 					}
@@ -699,7 +699,7 @@ my @sql_types_supported = ();
 					,TYPE					=> [ map { $_->Type } @$ado_fields ]
 					,PRECISION		=> [ map { $_->Precision } @$ado_fields ]
 					,SCALE				=> [ map { $_->NumericScale } @$ado_fields ]
-					,NULLABLE			=> [ map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1 : 0 } @$ado_fields ] 
+					,NULLABLE			=> [ map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1 : 0 } @$ado_fields ]
 	    		,Statement		=> $rs->Source
 					,LongReadLen	=> 0
 					,LongTruncOk	=> 0
@@ -730,7 +730,7 @@ my @sql_types_supported = ();
 
 
 			# print "Map of Fields that May Be NULL",
-			# 	join ( ",", map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1:0 } @$ado_fields ), 
+			# 	join ( ",", map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1:0 } @$ado_fields ),
 			# 	"\n";
 
 			$sth->STORE( NUM_OF_FIELDS	=> scalar @$ado_fields );
@@ -745,12 +745,12 @@ my @sql_types_supported = ();
 
 	# Determine the number of parameters, if Refresh fails.
 	sub _params
-	{ 
+	{
 		my $sql = shift;
 		use Text::ParseWords;
 		$^W = 0;
 		$sql =~ s/\n/ /;
-			my $rtn = join( " ", grep { m/\?/ } 
+			my $rtn = join( " ", grep { m/\?/ }
 				grep { ! m/^['"].*\?/ } &quotewords('\s+', 1, $sql));
 		my $cnt = ($rtn =~ tr /?//) || 0;
 		return $cnt;
@@ -790,43 +790,6 @@ my @sql_types_supported = ();
 		return @$row;
 	}
 
-#	sub get_info {
-#		my($dbh, $info_type) = @_;
-#
-#		# XXX Caching
-#		if ( $info_type eq 'SQL_KEYWORDS') {
-#			my $sth = $dbh->func('adSchemaDBInfoKeywords','OpenSchema');
-#			my @Keywords = ();
-#			while ( my $row = $sth->fetch ) {
-#				push @Keywords, $row->[0];
-#			}
-#			return join ',', @Keywords;
-#		}
-#		if ( $info_type eq 'SQL_IDENTIFIER_QUOTE_CHAR') {
-#			my $sth = $dbh->func('adSchemaDBInfoLiterals','OpenSchema');
-#			while ( my $row = $sth->fetch ) {
-#				return $row->[1] if $row->[0] eq 'QUOTE'; # XXX QUOTE_PREFIX, QUOTE_SUFFIX
-#			}
-#		}
-#		my %gi = (
-#			SQL_CATALOG_TERM     => 'Catalog Term'
-#		, SQL_DATA_SOURCE_NAME => 'Data Source Name'  # XXX SQL_DATABASE_NAME
-#		, SQL_DBMS_NAME        => 'DBMS Name'
-#		, SQL_DBMS_VERSION     => 'DBMS Version'
-#		, SQL_DRIVER_NAME      => 'Provider Name'     # XXX __FILE__
-#		, SQL_DRIVER_VER       => 'Provider Version'  # XXX $DBD::ADO::VERSION
-#		, SQL_PROCEDURE_TERM   => 'Procedure Term'
-#		, SQL_SCHEMA_TERM      => 'Schema Term'
-#		, SQL_TABLE_TERM       => 'Table Term'
-#		, SQL_USER_NAME        => 'User Name'
-#		);
-#		if ( exists $gi{$info_type} ) {
-#			return $dbh->{ado_conn}->Properties->{$gi{$info_type}}{Value};
-#		}
-#		return undef;
-#	}
-
-  
 	sub table_info {
 		my($dbh, $attribs) = @_;
 		$attribs = {
@@ -846,7 +809,7 @@ my @sql_types_supported = ();
 		$dbh->{ado_conn}->{CursorLocation} = $ado_consts->{adUseClient};
 
 		my @tp;
-		my $field_names = $attribs->{ADO_Columns} 
+		my $field_names = $attribs->{ADO_Columns}
 			?  $ado_schematables : $ado_dbi_schematables;
 		my $oRec;
 
@@ -894,8 +857,8 @@ my @sql_types_supported = ();
 		}
 		#
 		# If the value of $schema is '%' and $catalog and $table are empty
-		# strings, the result set contains a list of schema names. 
-		# 
+		# strings, the result set contains a list of schema names.
+		#
 		elsif ( (defined $attribs->{TABLE_CAT} and $attribs->{TABLE_CAT}   eq '')
 				 && (defined $attribs->{TABLE_SCHEM} and $attribs->{TABLE_SCHEM} eq '%')
 				 && (defined $attribs->{TABLE_NAME} and $attribs->{TABLE_NAME}  eq '') ) { # Rule 19b
@@ -932,7 +895,7 @@ my @sql_types_supported = ();
 				}
 			}
 		}
-		# 
+		#
 		# If the value of $type is '%' and $catalog, $schema, and $table are all
 		# empty strings, the result set contains a list of table types.
 		#
@@ -973,17 +936,17 @@ my @sql_types_supported = ();
 				}
 
 				while(! $oRec->{EOF}) {
-					my @out = map { $oRec->Fields($_)->{Value} } 
+					my @out = map { $oRec->Fields($_)->{Value} }
 						map { $sch_dbi_to_ado->{$_} } @$field_names;
 					# Jan Dubois jand@activestate.com addition to handle changes
 					# in Win32::OLE return of Variant types of data.
 					foreach ( @out ) {
-						$_ = $_->As(Win32::OLE::Variant::VT_BSTR()) 
+						$_ = $_->As(Win32::OLE::Variant::VT_BSTR())
 							if (defined $_) && (UNIVERSAL::isa($_, 'Win32::OLE::Variant'));
 					}
 					if ($attribs->{Trim_Catalog}) {
-						$out[0] =~ s/^(.*\\)// if defined $out[0];  # removes leading 
-						$out[0] =~ s/(\..*)$// if defined $out[0];  # removes file extension 
+						$out[0] =~ s/^(.*\\)// if defined $out[0];  # removes leading
+						$out[0] =~ s/(\..*)$// if defined $out[0];  # removes file extension
 					}
 					push( @tp, \@out );
 					$oRec->MoveNext;
@@ -994,7 +957,7 @@ my @sql_types_supported = ();
 				}
 		}
 
-		$oRec->Close if $oRec; 
+		$oRec->Close if $oRec;
 		$oRec = undef;
 		$dbh->{ado_conn}->{CursorLocation} = $tmpCursorLocation;
 
@@ -1123,7 +1086,7 @@ my @sql_types_supported = ();
 			});
 	}
 
-  
+
 	sub foreign_key_info {
 		my( $dbh, @Criteria ) = @_;
 		my $Criteria = \@Criteria if @Criteria;
@@ -1319,19 +1282,19 @@ my @sql_types_supported = ();
 	    );
 
 	    my @sql_types = (
-				DBI::SQL_BINARY(), 
+				DBI::SQL_BINARY(),
 				DBI::SQL_BIT(),
 				DBI::SQL_CHAR(),
-				DBI::SQL_DATE(), 
-				DBI::SQL_DECIMAL(), 
+				DBI::SQL_DATE(),
+				DBI::SQL_DECIMAL(),
 				DBI::SQL_DOUBLE(),
-				DBI::SQL_FLOAT(), 
-				DBI::SQL_INTEGER(), 
+				DBI::SQL_FLOAT(),
+				DBI::SQL_INTEGER(),
 				DBI::SQL_LONGVARBINARY(),
-				DBI::SQL_LONGVARCHAR(), 
-				DBI::SQL_NUMERIC(), 
+				DBI::SQL_LONGVARCHAR(),
+				DBI::SQL_NUMERIC(),
 				DBI::SQL_REAL(),
-				DBI::SQL_SMALLINT(), 
+				DBI::SQL_SMALLINT(),
 				DBI::SQL_TIMESTAMP(),
 				DBI::SQL_TINYINT(),
 				DBI::SQL_VARBINARY(),
@@ -1344,7 +1307,7 @@ my @sql_types_supported = ();
 			# Get the Provider Types attributes.
 			my @sort_rows;
 			my %ct;
-			my $oLRec = 
+			my $oLRec =
 				$conn->OpenSchema($ado_consts->{adSchemaProviderTypes});
 				my $lastError = DBD::ADO::errors($conn);
 				return $dbh->DBI::set_err($DBD::ADO::err, "OpenSchema error: $lastError") if $lastError;
@@ -1357,7 +1320,7 @@ my @sql_types_supported = ();
 				my $type_name = $oLRec->{TYPE_NAME}->{Value};
 				my $def;
 				push ( @sort_rows,  $def = join( " ",
-					$oLRec->{DATA_TYPE}->Value, 
+					$oLRec->{DATA_TYPE}->Value,
 					$oLRec->{BEST_MATCH}->Value || 0,
 					$oLRec->{IS_LONG}->Value || 0,
 					$oLRec->{IS_FIXEDLENGTH}->Value || 0,
@@ -1401,12 +1364,12 @@ my @sql_types_supported = ();
 						$g_ref = qr{^($loc_t)\s\d\s\d\s};
 				}
 
-				my @tm = 
+				my @tm =
 					sort { $b cmp $a }
 					grep { /$g_ref/ } @sort_rows;
 					next unless @tm;
 					foreach (@tm) {
-						my ($cc) = m/\d+\s+(\D\w.*)$/;
+						my ($cc) = m/\d+\s+(\D\w?.*)$/;
 						# Look for the record.
 						carp "$cc does not exist in hash\n" unless exists $ct{$cc};
 						my @rec = @{$ct{$cc}};
@@ -1440,10 +1403,10 @@ my @sql_types_supported = ();
 		my ($dbh, $AdoType, $IsFixed, $IsLong ) = @_;
 
 		# Set default values for IsFixed and IsLong.
-		$IsFixed = 0 unless $IsFixed; 
+		$IsFixed = 0 unless $IsFixed;
 		$IsLong  = 0 unless $IsLong ;
 
-		# method called with different handlers.  
+		# method called with different handlers.
 		# Determine if call is statement or database handle.  If a statement handle
 		# change value to the database handle.
 
@@ -1505,12 +1468,12 @@ my @sql_types_supported = ();
 		Carp::croak qq{_open_schema called with dbh defined} unless $dbh;
 
 		unless (exists $ado_consts->{$var}) {
-			return DBI::set_err($dbh, $DBD::ADO::err, 
+			return DBI::set_err($dbh, $DBD::ADO::err,
 				"OpenSchema called with unknown parameter: $var");
 		}
 		my $crit = \@crit if @crit;
 		my $conn = $dbh->{ado_conn};
-		my $oLRec = 
+		my $oLRec =
 # 		$conn->OpenSchema($ado_consts->{$var});
  			$conn->OpenSchema($ado_consts->{$var}, $crit);
 		my $lastError = DBD::ADO::errors($conn);
@@ -1566,7 +1529,7 @@ my @sql_types_supported = ();
 						and not $dbh->{ado_provider_support_auto_commit};
 					# Cause the application to die, user attempting to
 					# change the auto commit value.
-					Carp::croak 
+					Carp::croak
 						qq{Provider does not support auto commit: },
 						$dbh->{ado_provider_auto_commit_comments},
 						qq{\n}
@@ -1613,11 +1576,11 @@ my @sql_types_supported = ();
 			# Didn't change the value.
 			return $cv;
 		}
-		
+
     sub DESTROY {  # Database handle
 			my ($dbh) = @_;
 			my $ado_consts = $dbh->{ado_consts};
-			
+
 			croak "Database handle called with undefined dbh ... very odd!"
 				unless defined $dbh;
 
@@ -1635,7 +1598,7 @@ my @sql_types_supported = ();
 				local ($Win32::OLE::Warn);
 				$Win32::OLE::Warn = 0;
 				# Determine if a connection is made, close an open connection.
-				if (defined $conn and 
+				if (defined $conn and
 					$conn->State & $ado_consts->{adStateOpen}) {
 
 					$dbh->trace_msg( "<- State: (" . $conn->State  . ")\n");
@@ -1645,13 +1608,13 @@ my @sql_types_supported = ();
 					# does not start another transaction.
 					$conn->{Attributes} = 0;
 					my $lastError = DBD::ADO::errors($conn);
-					return DBI::set_err( $conn, $DBD::ADO::err, 
+					return DBI::set_err( $conn, $DBD::ADO::err,
 							"Failed setting CommitRetaining: $lastError") #-2147168242
 					if $lastError and $lastError !~ m/-2147168242/;
 
 					$dbh->trace_msg( "<- modified connection Attributes " . $conn->{Attributes} . "\n");
 					$dbh->trace_msg( "<- AutoCommit -> $auto  Provider Support -> $dbh->{ado_provider_support_auto_commit} Comments -> $dbh->{ado_provider_auto_commit_comments}\n");
-					$dbh->{ado_provider_auto_commit_comments} = 
+					$dbh->{ado_provider_auto_commit_comments} =
 					$conn->CommitTrans if $auto and
 						$dbh->{ado_provider_support_auto_commit};
 
@@ -1659,9 +1622,9 @@ my @sql_types_supported = ();
 						not $dbh->{ado_provider_support_auto_commit};
 
 					$lastError = DBD::ADO::errors($conn);
-					return $dbh->DBI::set_err( $DBD::ADO::err, "Failed to execute rollback: $lastError") 
+					return $dbh->DBI::set_err( $DBD::ADO::err, "Failed to execute rollback: $lastError")
 						if $lastError and $lastError !~ m/-2147168242/;
-					# Provider error about transaction not started.  Ignore message, 
+					# Provider error about transaction not started.  Ignore message,
 					# clear error codes.
 					DBD::ADO::errors($conn) if ($lastError and $lastError =~ m/-2147168242/);
 
@@ -1709,7 +1672,7 @@ my @sql_types_supported = ();
 					$str = $fld->GetChunk( $lng );
 				} else {
 					my $s = $fld->Value;
-					$str = substr($s, $offset, $lng); 
+					$str = substr($s, $offset, $lng);
 				}
 			return( (defined($str) and length($str))? $str: "" );
 		}
@@ -1766,7 +1729,7 @@ my @sql_types_supported = ();
 		sub _convert_type {
 			my $t = shift;
 			for (my $x = 0; $x <= $#sql_types_supported; $x += 2) {
-				return $sql_types_supported[$x+1] 
+				return $sql_types_supported[$x+1]
 					if ($sql_types_supported[$x] == $t);
 			}
 			return 0;
@@ -1814,7 +1777,7 @@ my @sql_types_supported = ();
 				# Turn the OLE Warning Off for this test.
 				local ($Win32::OLE::Warn);
 				$Win32::OLE::Warn = 0;
-				$parm_cnt = $p->{Count};	
+				$parm_cnt = $p->{Count};
 				$lastError = DBD::ADO::errors($conn);
 				$not_supported = ( $DBD::ADO::err eq EXCEPTION_OCC ) || 0;
 			}
@@ -1823,7 +1786,7 @@ my @sql_types_supported = ();
 
 			# Remember if the provider errored with a "not supported" message.
 
-			return DBI::set_err( $sth, $DBD::ADO::err, 
+			return DBI::set_err( $sth, $DBD::ADO::err,
 		  		"Bind params passed without place holders")
 	    if (@bind_values and $p->{Count} == 0);
 
@@ -1855,7 +1818,7 @@ my @sql_types_supported = ();
 
 			$x = 0;
 
-			# If the provider errored with not_supported above in the Parameters 
+			# If the provider errored with not_supported above in the Parameters
 			# methods, do not attempt to display anything about the object.  If we
 			# it triggers warning message.
 			unless($not_supported) {
@@ -1874,7 +1837,7 @@ my @sql_types_supported = ();
 			# Return the affected number to rows.
 			my $rows = Variant->new($VT_I4_BYREF, 0);
 
-			# However, a RecordSet Open does not return affected rows.  So I need to 
+			# However, a RecordSet Open does not return affected rows.  So I need to
 			# determine if a recordset open is needed, or a command execute.
 				# print "usecmd ", exists $sth->{ado_usecmd},			defined $sth->{ado_usecmd}, "\n";
 				# print "CursorType ", exists $sth->{ado_attribs}->{CursorType},  defined $sth->{ado_attribs}->{CursorType}, "\n";
@@ -1916,7 +1879,7 @@ my @sql_types_supported = ();
 				# Execute the statement, get a recordset in return.
 				# $rs = $comm->Execute($rows);
 				$lastError = DBD::ADO::errors($conn);
-				return $sth->DBI::set_err( $DBD::ADO::err, 
+				return $sth->DBI::set_err( $DBD::ADO::err,
 						"Can't execute statement '$sql': $lastError")
 				if $DBD::ADO::err;
 			} else {
@@ -1924,7 +1887,7 @@ my @sql_types_supported = ();
 				# Execute the statement, get a recordset in return.
 				$rs = $comm->Execute($rows);
 				$lastError = DBD::ADO::errors($conn);
-				return $sth->DBI::set_err( $DBD::ADO::err, 
+				return $sth->DBI::set_err( $DBD::ADO::err,
 						"Can't execute statement '$sql': $lastError")
 				if $DBD::ADO::err;
 			}
@@ -1935,11 +1898,11 @@ my @sql_types_supported = ();
 			if ($num_of_fields == 0) {	# assume non-select statement
 
 					# If the AutoCommit is on, Commit current transaction.
-					$conn->CommitTrans 
-						if $sth->{ado_dbh}->{AutoCommit} 
+					$conn->CommitTrans
+						if $sth->{ado_dbh}->{AutoCommit}
 							and $sth->{ado_dbh}->{ado_provider_support_auto_commit};
 					$lastError = DBD::ADO::errors($conn);
-					return DBI::set_err( $sth, $DBD::ADO::err, 
+					return DBI::set_err( $sth, $DBD::ADO::err,
 							"Execute: Commit failed: $lastError")
 						if $lastError;
 
@@ -1966,7 +1929,7 @@ my @sql_types_supported = ();
 					$sth->trace_msg( "  changing the CacheSize using RowCacheSize: $rowcache" );
 					$rs->CacheSize( $rowcache ) unless $rowcache == $currowcache;
 					$lastError = DBD::ADO::errors($conn);
-					return $sth->DBI::set_err( $DBD::ADO::err, 
+					return $sth->DBI::set_err( $DBD::ADO::err,
 							"  Unable to change CacheSize to RowCacheSize : $rowcache : $lastError")
 					if $DBD::ADO::err;
 				warn "Changed CacheSize\n";
@@ -1977,16 +1940,16 @@ my @sql_types_supported = ();
 		$sth->STORE('NUM_OF_FIELDS' => $num_of_fields)
 			unless ($nof == $num_of_fields);
 		$sth->STORE( NAME				=> [ map { $_->Name } @$ado_fields ] );
-		$sth->STORE( TYPE				=> [ map { 
-						DBD::ADO::db::convert_ado_to_odbc($sth, $_->Type) 
+		$sth->STORE( TYPE				=> [ map {
+						scalar DBD::ADO::db::convert_ado_to_odbc($sth, $_->Type)
 					} @$ado_fields ] );
 		$sth->STORE( PRECISION	=> [ map { $_->Precision } @$ado_fields ] );
-		$sth->STORE( SCALE			=> [ 
+		$sth->STORE( SCALE			=> [
 			map { $_->NumericScale } @$ado_fields ] );
-		$sth->STORE( NULLABLE		=> 
-			[ 
-				map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1 : 0 } 
-						@$ado_fields 
+		$sth->STORE( NULLABLE		=>
+			[
+				map { $_->Attributes & $ado_consts->{adFldMayBeNull}? 1 : 0 }
+						@$ado_fields
 			]
 		);
 
@@ -1994,11 +1957,11 @@ my @sql_types_supported = ();
 
 		# print "May Defer"
 		# 	, join( ", "
-		# 		, map { $_->Attributes & $ado_consts->{adFldMayDefer}? 1 : 0 } 
+		# 		, map { $_->Attributes & $ado_consts->{adFldMayDefer}? 1 : 0 }
 		# 				@$ado_fields ), "\n";
 		# print "Is Long"
 		# 	, join( ", "
-		# 		, map { $_->Attributes & $ado_consts->{adFldLong}? 1 : 0 } 
+		# 		, map { $_->Attributes & $ado_consts->{adFldLong}? 1 : 0 }
 		# 				@$ado_fields ), "\n";
 
 		$sth->STORE( CursorName		=> undef);
@@ -2025,10 +1988,10 @@ my @sql_types_supported = ();
 			my $ado_consts = $sth->{ado_dbh}->{ado_consts};
 
 			# return undef unless $sth->FETCH('Active');
-			return $sth->DBI::set_err( -900, 
+			return $sth->DBI::set_err( -900,
 		  	"statement handle not marked as Active.") unless $sth->FETCH('Active');
 
-			return $sth->DBI::set_err( -905, 
+			return $sth->DBI::set_err( -905,
 		  	"Recordset Undefined, execute statement not called?") unless $rs;
 
 			return undef if $rs->EOF;
@@ -2042,19 +2005,19 @@ my @sql_types_supported = ();
 			return undef if $rs->{EOF};
 
 			my $lastError = DBD::ADO::errors($sth->{ado_conn});
-			return DBI::set_err( $sth, $DBD::ADO::err, 
+			return DBI::set_err( $sth, $DBD::ADO::err,
 		  	"Fetch failed: $lastError")
 	    if $lastError;
 
 
 			my $ado_fields = $sth->{ado_fields};
 
-			my $row = 
+			my $row =
 				[ map { $rs->Fields($_->{Name})->{Value} } @$ado_fields ];
 			# Jan Dubois jand@activestate.com addition to handle changes
 			# in Win32::OLE return of Variant types of data.
   		foreach (@$row) {
-      	$_ = $_->As(VT_BSTR) 
+      	$_ = $_->As(VT_BSTR)
 					if UNIVERSAL::isa($_, 'Win32::OLE::Variant');
   		}
 			if ($sth->FETCH('ChopBlanks')) {
@@ -2126,7 +2089,7 @@ my @sql_types_supported = ();
 						if (defined $sth->{ado_comm}) {
 							$sth->{ado_comm}->{$change_affect->{$attrib}} = $value;
 							my $lastError = DBD::ADO::errors($sth->{ado_conn});
-							return $sth->DBI::set_err( $DBD::ADO::err, 
+							return $sth->DBI::set_err( $DBD::ADO::err,
 								"Store change $attrib: $value: $lastError")
 							if $lastError;
 						}
@@ -2147,8 +2110,8 @@ my @sql_types_supported = ();
 				# carp "Statement handle has active recordset" if defined $rs;
 
 				$sth->trace_msg( "<- destroy statement handler\n", 1 );
-				$rs->Close () 
-					if (defined $rs 
+				$rs->Close ()
+					if (defined $rs
 						and UNIVERSAL::isa($rs, 'Win32::OLE')
 						and ($rs->State != $ado_consts->{adStateClosed}));
 				$rs = undef;
@@ -2182,7 +2145,7 @@ DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
 	dbi:ADO:dsn;ConnectTimeout=60 (your number)
 	or include both ConnectTimeout and CommandTimeout.
 
-	The dsn may be a standard ODBC dsn or a dsn-less. 
+	The dsn may be a standard ODBC dsn or a dsn-less.
 	See the ADO documentation for more information on
 	the dsn-less connection.
 
@@ -2190,7 +2153,7 @@ DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
 
 =head1 DESCRIPTION
 
-The DBD::ADO module supports ADO access on a Win32 machine.  
+The DBD::ADO module supports ADO access on a Win32 machine.
 DBD::ADO is written to support the standard DBI interface to
 data sources.
 
@@ -2200,7 +2163,7 @@ data sources.
 
 	Connection supports dsn and dsn-less calls.
 
-	$dbh = DBI->connect( "dbi:ADO:File Name=oracle.udl", 
+	$dbh = DBI->connect( "dbi:ADO:File Name=oracle.udl",
 		$user, $passwd, {RaiseError => [0|1], PrintError => [0|1],
 		AutoCommit => [0|1]});
 
@@ -2223,7 +2186,7 @@ data sources.
 
 	Using the standard DBI function call
 		$dbh->func( arguments, 'function name')
-	
+
 	You may access the following functions: (case sensitive)
 		OpenSchema
 
@@ -2258,7 +2221,7 @@ The B<prepare> methods allows attributes: (from DBI)
 				my $col = $sth2->fetchrow_hashref;
 				...
 			}
-		It may be necessary to prepare the statement using CursorType => adOpenStatic. 
+		It may be necessary to prepare the statement using CursorType => adOpenStatic.
 
 		Changing the CursorType is a solution to the following problem.
 			Can't execute statement 'select * from authors':
@@ -2285,36 +2248,38 @@ B<Warning:> This method is experimental and may change or disappear.
 
 	$sth = $dbh->table_info(\%attr);
 
-	$sth = $dbh->table_info({ 
-		TABLE_TYPE => 'VIEW', 
-		ADO_Columns => 1, 
-		Trim_Catalog => 0, 
+	$sth = $dbh->table_info({
+		TABLE_TYPE => 'VIEW',
+		ADO_Columns => 1,
+		Trim_Catalog => 0,
 		Filter => q{TABLE_NAME LIKE 'C%'},
 	});
 
 Returns an active statement handle that can be used to fetch
-information about tables and views that exist in the database.  
+information about tables and views that exist in the database.
 By default the handle contains the columns described in the DBI documentation:
 
-	TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS  
+	TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS
+
+=over
 
 =item B<ADO_Columns>
 
-Additional ADO-only fields will be included if the ADO_Columns attribute 
+Additional ADO-only fields will be included if the ADO_Columns attribute
 is set to true:
 
 	%attr = (ADO_Columns => 1);
 
 =item B<Trim_Catalog>
 
-Some ADO providers include path info in the TABLE_CAT column.  
+Some ADO providers include path info in the TABLE_CAT column.
 This information will be trimmed if the Trim_Catalog attribute is set to true:
 
 	%attr = (Trim_Catalog => 1);
 
 =item B<Criteria>
 
-The ADO driver allows column criteria to be specified.  In this way the 
+The ADO driver allows column criteria to be specified.  In this way the
 record set can be restricted, for example, to only include tables of type 'VIEW':
 
 	%attr = (TABLE_TYPE => 'VIEW')
@@ -2325,28 +2290,30 @@ You can add criteria for any of the following columns:
 
 =item B<Filter>
 
-The ADO driver also allows the recordset to be filtered on a Criteria string: 
-a string made up of one or more individual clauses concatenated with AND or OR operators.  
+=back
+
+The ADO driver also allows the recordset to be filtered on a Criteria string:
+a string made up of one or more individual clauses concatenated with AND or OR operators.
 
 	%attr = (Filter => q{TABLE_TYPE LIKE 'SYSTEM%'})
 
-The criteria string is made up of clauses in the form FieldName-Operator-Value.  
-This is more flexible than using column criteria in that the filter allows a number of operators: 
+The criteria string is made up of clauses in the form FieldName-Operator-Value.
+This is more flexible than using column criteria in that the filter allows a number of operators:
 
 	<, >, <=, >=, <>, =, or LIKE
 
 The Fieldname must be one of the ADO 'TABLES Rowset' column names:
 
-	TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION, 
+	TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, DESCRIPTION,
 	TABLE_GUID, TABLE_PROPID, DATE_CREATED, DATE_MODIFIED
 
-Value is the value with which you will compare the field values 
-(for example, 'Smith', #8/24/95#, 12.345, or $50.00). 
-Use single quotes with strings and pound signs (#) with dates. 
-For numbers, you can use decimal points, dollar signs, and scientific notation. 
-If Operator is LIKE, Value can use wildcards. 
-Only the asterisk (*) and percent sign (%) wild cards are allowed, 
-and they must be the last character in the string. Value cannot be null. 
+Value is the value with which you will compare the field values
+(for example, 'Smith', #8/24/95#, 12.345, or $50.00).
+Use single quotes with strings and pound signs (#) with dates.
+For numbers, you can use decimal points, dollar signs, and scientific notation.
+If Operator is LIKE, Value can use wildcards.
+Only the asterisk (*) and percent sign (%) wild cards are allowed,
+and they must be the last character in the string. Value cannot be null.
 
 
 =head2 tables
@@ -2355,7 +2322,7 @@ B<Warning:> This method is experimental and may change or disappear.
 
 	@names = $dbh->tables(\%attr);
 
-Returns a list of table and view names. 
+Returns a list of table and view names.
 Accepts any of the attributes described in the L<table_info> method:
 
 	@names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
@@ -2379,7 +2346,7 @@ It is strongly recommended that you use the latest version of ADO
 
 =head1 AUTHORS
 
-Phlip and Tim Bunce. With many thanks to Jan Dubois and Jochen Wiedmann
+Tim Bunce and Phlip. With many thanks to Jan Dubois and Jochen Wiedmann
 for additions, debuggery and general help.
 Special thanks to Thomas Lowery, who maintained this module 2001-2003.
 Current maintainer is Steffen Goeldner.

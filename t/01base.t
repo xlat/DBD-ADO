@@ -1,19 +1,16 @@
-#!/usr/bin/perl 
 
-print "1..$tests\n";
+use Test::More tests => 5;
 
 require DBI;
-print "ok 1\n";
+pass 'DBI required';
 
 import DBI;
-print "ok 2\n";
+pass 'DBI imported';
 
 $switch = DBI->internal;
-(ref $switch eq 'DBI::dr') ? print "ok 3\n" : print "not ok 3\n";
+is ref $switch,'DBI::dr','switch';
 
 $drh = DBI->install_driver('ADO');
-(ref $drh eq 'DBI::dr') ? print "ok 4\n" : print "not ok 4\n";
-print "ok 5\n" if $drh->{Version};
+is ref $drh,'DBI::dr','drh';
 
-BEGIN{$tests = 5;}
-exit(0);
+ok $drh->{Version},'Version: ' . $drh->{Version};

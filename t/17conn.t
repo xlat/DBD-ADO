@@ -49,9 +49,12 @@ ok(!$dbh->disconnect(), "Disconnect from database" );
 
 $dbh = DBI->connect() or die "Connect failed: $DBI::errstr\n";
 pass( "Database connection created." );
-
-ok(!$dbh->do( 'drop table fred' ), "Drop table fred" );
-
+{
+  local $dbh->{PrintError} = 0;
+  local $dbh->{RaiseError} = 1;
+  ok(!eval{$dbh->do( 'drop table fred' )}, "Drop table fred" );
+  print $@, "\n";
+}
 ok($dbh->do( 'create table fred (chr char(1))' ), "Create table fred" );
 
 my $sth;
@@ -82,8 +85,3 @@ my $types = $dbh->type_info_all();
 # print Dumper($types), "\n";
 
 ok(!$dbh->disconnect(), "Disconnect from database" );
-
-
-exit;
-
-__END__

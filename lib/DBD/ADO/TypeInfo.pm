@@ -8,7 +8,7 @@ use Win32::OLE::TypeInfo();
 
 use vars qw($VERSION);
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 my $ProgId  = 'ADODB.Connection';
 my $VarSkip = Win32::OLE::TypeInfo::VARFLAG_FHIDDEN()
@@ -89,6 +89,13 @@ namespace preserved.
 
 The Enums() method of this package return a hash of hashes for exactly this
 purpose.
+
+=head1 TODO
+
+Try a XS implementation and benchmark speed-up.
+
+Suggest a more general version (parameterized by $ProgId) for inclusion
+into Win32::OLE.
 
 =head1 AUTHOR
 

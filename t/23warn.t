@@ -2,42 +2,38 @@
 # vim:ts=2:sw=2:ai:aw:nu:
 $| = 1;
 
+# XXX This file should be named XXtimeout.t.
+# XXX A separate XXXwarn.t would be useful.
+# XXX Is there a portable way to implement these tests?
+
 # Generate large number of test rows.
 
 use strict;
 use warnings;
-use DBI qw(:sql_types);
-use Time::HiRes qw(gettimeofday tv_interval);
-
-use Data::Dumper;
-
-use vars qw($tests $table_name);
-use constant MAX_ROWS => 200;
-
-$table_name = "products";
+use DBI();
+#use Time::HiRes qw(gettimeofday tv_interval);
 
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 3;
+	plan tests => 2;
 } else {
 	plan skip_all => 'Cannot test without DB info';
 }
 
-pass( "Begining test, modules loaded" );
+#use constant MAX_ROWS => 200;
 
-my $dbh = DBI->connect( $ENV{DBI_DSN}, $ENV{DBI_USER}, $ENV{DBI_PASS},
-	{
-		ado_commandtimeout	=> 20
-	}) 
-	or die "Connect failed: $DBI::errstr\n";
-		  # ado_cursortype			=> 'adOpenStatic'
-pass( "Database connection created." );
+pass('Beginning test, modules loaded');
 
-my $sth = $dbh->prepare(q{select * from products});
-ok( defined $sth, "Prepared select statement" );
-$sth->execute;
-$sth->dump_results;
-$dbh->disconnect();
+my $att = { ado_commandtimeout => 20 };  # ado_cursortype => 'adOpenStatic'
 
-__END__
+my $dbh = DBI->connect( $ENV{DBI_DSN}, $ENV{DBI_USER}, $ENV{DBI_PASS}, $att )
+  or die "Connect failed: $DBI::errstr\n";
+pass('Database connection created');
+
+#my $sth = $dbh->prepare(q{select * from products});
+#ok( defined $sth, "Prepared select statement" );
+#$sth->execute;
+#$sth->dump_results;
+
+$dbh->disconnect;

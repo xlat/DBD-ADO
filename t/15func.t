@@ -95,31 +95,30 @@ ok (!$@, "type_info(undef)");
 $sth = undef;
 
 # Quote
- eval {
-	 my $val = $dbh->quote();
- 	die unless $val;
- };
-ok ($@, "quote error expected, $@ " .  $dbh->errstr );
-$sth = undef;
+eval { $dbh->quote() };
+
+
+
+ok( $@,"Call to quote() with 0 arguments, error expected: $@ ");
+
 # Tests for quote:
 my @qt_vals = (1, 2, undef, 'NULL', "ThisIsAString", "This is Another String");
 my @expt_vals = (q{'1'}, q{'2'}, "NULL", q{'NULL'}, q{'ThisIsAString'}, q{'This is Another String'});
 for (my $x = 0; $x <= $#qt_vals; $x++) {
-	local $^W = 0;
-	my $val = $dbh->quote( $qt_vals[$x] );
-	is( $val, $expt_vals[$x], "$x: quote on $qt_vals[$x] returned $val" );
+  my $val1 = defined $qt_vals[$x] ? $qt_vals[$x] : 'undef';
+  my $val = $dbh->quote( $qt_vals[$x] );
+  is( $val, $expt_vals[$x],"$x: quote on $val1 returned $val");
 }
 
 is( $dbh->quote( 1, SQL_INTEGER() ), 1, "quote(1, SQL_INTEGER)" );
 
 
 # Quote Identifier
- eval {
-	 my $val = $dbh->quote_identifier();
- 	die unless $val;
- };
-ok ($@, "quote_identifier error expected $@ " .  $dbh->errstr );
-$sth = undef;
+eval { $dbh->quote_identifier() };
+
+
+
+ok( $@,"Call to quote_identifier() with 0 arguments, error expected: $@ ");
 
 #	, SQL_IDENTIFIER_QUOTE_CHAR	=> 29
 #	, SQL_CATALOG_NAME_SEPARATOR	=> 41
@@ -230,22 +229,13 @@ SKIP: {
 
 	$sth = $dbh->primary_key_info(undef, undef, undef );
 
-	skip "primary_key_info not supported by provider", 5 unless $dbh->err != $non_supported;
+	skip 'primary_key_info not supported by provider', 5 if $dbh->err && $dbh->err == $non_supported;
 
 	ok( defined $dbh->err, "Call dbh->primary_key_info() ... " );
 	ok( defined $sth, "Statement handle defined for primary_key_info()" );
 
-	if ( defined $sth ) {
-		while( my $row = $sth->fetchrow_arrayref ) {
-			{
-				local $^W = 0;
-				print join( ", ", @$row, "\n" );
-			}
-		}
-
-		undef $sth;
-
-	}
+  $sth->dump_results if defined $sth;
+  undef $sth;
 
 	$sth = $dbh->primary_key_info(undef, undef, undef );
 	ok( defined $dbh->err, "Call dbh->primary_key_info() ... " .
@@ -272,7 +262,7 @@ SKIP: {
 	local ($dbh->{Warn}, $dbh->{PrintError});
 	$dbh->{PrintError} = $dbh->{Warn} = 0;
 	$sth = $dbh->foreign_key_info();
-	skip "foreign_key_info not supported by provider", 1 unless $dbh->err != $non_supported;
+	skip 'foreign_key_info not supported by provider', 1 if $dbh->err && $dbh->err == $non_supported;
 	ok( defined $sth, "Statement handle defined for foreign_key_info()" );
 	DBI::dump_results($sth) if defined $sth;
 	$sth = undef;

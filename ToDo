@@ -1,5 +1,15 @@
 
+Improve Txn, AutoCommit and the like.
+
+Improve FoxPro support, especially Refresh() issue and tests.
+
+Fix the warning 'Use of uninitialized value in hash element at
+DBI.pm line 1799'.
+
+Reimplement the t/23warn.t tests.
+
 Mon  Apr 8, 2002  23:06:36
+
 Modify code to use new package DBD::ADO::TypeInfo
 
 Clean up the ADO -> ODBC and ODBC -> ADO code.
