@@ -21,11 +21,8 @@ ParamValues: What's the reason for the following problem?
 
 Add $dbh->last_insert_id
 
+Reimplement 'invalid attribute' test in t/21sth.t (catch warning).
+
 Reimplement the t/23warn.t tests.
 
-Mon  Apr 8, 2002  23:06:36
-
-Clean up the ADO -> ODBC and ODBC -> ADO code.
-
-Fix the blob/clob/long support, including tests which I broke in version 2.5
-
+Improve LOB tests.

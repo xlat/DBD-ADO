@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state $errcum);
 
-  $VERSION = '2.91';
+  $VERSION = '2.92';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    =  0;     # The $DBI::err value
@@ -26,6 +26,7 @@
     if ( $DBI::VERSION >= 1.37 ) {
       DBD::ADO::db->install_method('ado_open_schema');
     }
+    $drh->STORE('LongReadLen', 2147483647 );
     return $drh;
   }
 
@@ -123,9 +124,6 @@
       Name           => $dsn
     , User           => $user
     , AutoCommit     => 1
-    , Warn           => 0
-    , LongReadLen    => 0
-    , LongTruncOk    => 0
     , ado_max_errors => 50
     , ado_ti_ver     => 2  # TypeInfo version
     });
@@ -179,6 +177,7 @@
 		}
 		$drh->trace_msg("    -- Transaction support: $this->{ado_txn_capable}\n", 5 );
 
+    $outer->STORE('Warn'  , 0 );
     $outer->STORE('Active', 1 );
 		return $outer;
 	}
@@ -355,9 +354,6 @@
 		, ado_type       => undef
 		});
 
-		$outer->STORE('LongReadLen', 0 );
-		$outer->STORE('LongTruncOk', 0 );
-
 		if ( exists $attribs->{RowsInCache} ) {
 			$outer->STORE('RowsInCache', $attribs->{RowsInCache} );
 		} else {
@@ -450,8 +446,6 @@
 		, SCALE          => [ map { $_->NumericScale } @$ado_fields ]
 		, NULLABLE       => [ map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayBeNull}? 1 : 0 } @$ado_fields ]
 		, Statement      => $rs->Source
-		, LongReadLen    => 0
-		, LongTruncOk    => 0
 		, CursorName     => undef
 		, ParamValues    => {}
 		, RowsInCache    => 0
@@ -716,7 +710,7 @@
 			              || $rs->{CHARACTER_MAXIMUM_LENGTH}{Value}
 			              || 0;  # Default value to stop warnings ???
 			my $TypeName;
-			my $ado_tis    = DBD::ADO::db::_ado_get_type_info_for( $dbh, $AdoType, $IsFixed, $IsLong );
+			my $ado_tis    = DBD::ADO::TypeInfo::Find3( $dbh, $AdoType, $IsFixed, $IsLong );
 			$dbh->trace_msg('    ** ' . $rs->{COLUMN_NAME}{Value} . "($ColSize): $AdoType, $IsFixed, $IsLong\n", 6 );
 			# find the first type which has a large enough COLUMN_SIZE:
 			for my $ti ( sort { $a->{COLUMN_SIZE} <=> $b->{COLUMN_SIZE} } @$ado_tis ) {
@@ -839,273 +833,9 @@
 
   sub type_info_all {
     my ($dbh) = @_;
-    return ( $dbh->{ado_ti_ver} == 2 ) ? &type_info_all_2 : &type_info_all_1;
-  }
-
-  sub type_info_all_2 {
-    my ($dbh) = @_;
-    my $QueryType = 'adSchemaProviderTypes';
-    my $conn = $dbh->{ado_conn};
-    my @Rows;
-    my $rs = $conn->OpenSchema( $ado_consts->{SchemaEnum}{$QueryType} );
-    return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
-
-    while ( !$rs->{EOF} ) {
-      my $AdoType = $rs->{DATA_TYPE     }{Value};
-      my $IsLong  = $rs->{IS_LONG       }{Value};
-      my $IsFixed = $rs->{IS_FIXEDLENGTH}{Value};
-      my @SqlType = DBD::ADO::TypeInfo::ado2dbi( $AdoType, $IsFixed, $IsLong );
-      my $Fields  =
-      [
-        $rs->{TYPE_NAME         }{Value} #  0 TYPE_NAME
-      , $SqlType[0]                      #  1 DATA_TYPE
-      , $rs->{COLUMN_SIZE       }{Value} #  2 COLUMN_SIZE
-      , $rs->{LITERAL_PREFIX    }{Value} #  3 LITERAL_PREFIX
-      , $rs->{LITERAL_SUFFIX    }{Value} #  4 LITERAL_SUFFIX
-      , $rs->{CREATE_PARAMS     }{Value} #  5 CREATE_PARAMS
-      , $rs->{IS_NULLABLE       }{Value} #  6 NULLABLE
-      , $rs->{CASE_SENSITIVE    }{Value} #  7 CASE_SENSITIVE
-      , $rs->{SEARCHABLE        }{Value} #  8 SEARCHABLE
-      , $rs->{UNSIGNED_ATTRIBUTE}{Value} #  9 UNSIGNED_ATTRIBUTE
-      , $rs->{FIXED_PREC_SCALE  }{Value} # 10 FIXED_PREC_SCALE
-      , $rs->{AUTO_UNIQUE_VALUE }{Value} # 11 AUTO_UNIQUE_VALUE
-      , $rs->{LOCAL_TYPE_NAME   }{Value} # 12 LOCAL_TYPE_NAME
-      , $rs->{MINIMUM_SCALE     }{Value} # 13 MINIMUM_SCALE
-      , $rs->{MAXIMUM_SCALE     }{Value} # 14 MAXIMUM_SCALE
-      , $SqlType[1]                      # 15 SQL_DATA_TYPE
-      , $SqlType[2]                      # 16 SQL_DATETIME_SUB
-      ];
-      $Fields->[8]--;
-      push @Rows, $Fields;
-      $rs->MoveNext;
-    }
-    $rs->Close; undef $rs;
-
-    # TODO: 2nd crit. for equal types
-    return [ $DBD::ADO::TypeInfo::Fields, sort { $a->[1] <=> $b->[1] } @Rows ];
-  }
-
-  sub type_info_all_1 {
-    my ($dbh) = @_;
-    my $names = {
-      TYPE_NAME          =>  0
-    , DATA_TYPE          =>  1
-    , COLUMN_SIZE        =>  2
-    , LITERAL_PREFIX     =>  3
-    , LITERAL_SUFFIX     =>  4
-    , CREATE_PARAMS      =>  5
-    , NULLABLE           =>  6
-    , CASE_SENSITIVE     =>  7
-    , SEARCHABLE         =>  8
-    , UNSIGNED_ATTRIBUTE =>  9
-    , FIXED_PREC_SCALE   => 10
-    , AUTO_UNIQUE_VALUE  => 11
-    , LOCAL_TYPE_NAME    => 12
-    , MINIMUM_SCALE      => 13
-    , MAXIMUM_SCALE      => 14
-    };
-    # If the type information is previously obtained, use it.
-    unless( $dbh->{ado_all_types_supported} ) {
-      ado_determine_type_support( $dbh )
-        or Carp::croak 'ado_determine_type_support failed: ', $dbh->{errstr};
-    }
-    my $ops = ado_open_schema( $dbh,'adSchemaProviderTypes')
-      or Carp::croak 'ops undefined!';
-
-    my $sth = DBI->connect('dbi:Sponge:','','', { RaiseError => 1 } )->prepare(
-      'adSchemaProviderTypes', { rows => [ @{$dbh->{ado_all_types_supported}} ]
-    , NAME => [ @{$ops->{NAME}} ]
-    });
-    $ops->finish; $ops = undef;
-
-    my @ti;
-    while ( my $row = $sth->fetchrow_hashref ) {
-      my $ti;
-      # Only add items from the above names list.
-      # When this list explans, the code 'should' still work.
-      while ( my ( $k, $v ) = each %$names ) {
-        $ti->[$v] = $row->{$k} || '';
-      }
-      push @ti, $ti;
-    }
-    return [ $names, @ti ];
-  }
-
-
-	sub ado_determine_type_support {
-		my ($dbh) = @_;
-		die 'dbh undefined' unless $dbh;
-
-		$dbh->trace_msg("    -> ado_determine_type_support\n", 3 );
-
-		my $conn = $dbh->{ado_conn};
-		my $Enums = DBD::ADO::Const->Enums;
-		my $Dt = $Enums->{DataTypeEnum};
-
-    # Attempt to convert data types from ODBC to ADO.
-    my %local_types = (
-      DBI::SQL_BINARY()        => [
-        $Dt->{adBinary}
-      , $Dt->{adVarBinary}
-      ]
-    , DBI::SQL_BIT()           => [ $Dt->{adBoolean}]
-    , DBI::SQL_CHAR()          => [
-        $Dt->{adChar}
-      , $Dt->{adVarChar}
-      , $Dt->{adWChar}
-      , $Dt->{adVarWChar}
-      ]
-    , DBI::SQL_DATE()          => [
-        $Dt->{adDBTimeStamp}
-      , $Dt->{adDate}
-      ]
-    , DBI::SQL_DECIMAL()       => [ $Dt->{adNumeric} ]
-    , DBI::SQL_DOUBLE()        => [ $Dt->{adDouble} ]
-    , DBI::SQL_FLOAT()         => [ $Dt->{adSingle} ]
-    , DBI::SQL_INTEGER()       => [ $Dt->{adInteger} ]
-    , DBI::SQL_LONGVARBINARY() => [
-        $Dt->{adLongVarBinary}
-      , $Dt->{adVarBinary}
-      , $Dt->{adBinary}
-      ]
-    , DBI::SQL_LONGVARCHAR()   => [
-        $Dt->{adLongVarChar}
-      , $Dt->{adVarChar}
-      , $Dt->{adChar}
-      , $Dt->{adLongVarWChar}
-      , $Dt->{adVarWChar}
-      , $Dt->{adWChar}
-      ]
-    , DBI::SQL_NUMERIC()       => [ $Dt->{adNumeric} ]
-    , DBI::SQL_REAL()          => [ $Dt->{adSingle} ]
-    , DBI::SQL_SMALLINT()      => [ $Dt->{adSmallInt} ]
-    , DBI::SQL_TIMESTAMP()     => [
-        $Dt->{adDBTime}
-      , $Dt->{adDBTimeStamp}
-      , $Dt->{adDate}
-      ]
-    , DBI::SQL_TINYINT()       => [ $Dt->{adUnsignedTinyInt} ]
-    , DBI::SQL_VARBINARY()     => [
-        $Dt->{adVarBinary}
-      , $Dt->{adLongVarBinary}
-      , $Dt->{adBinary}
-      ]
-    , DBI::SQL_VARCHAR()       => [
-        $Dt->{adVarChar}
-      , $Dt->{adChar}
-      , $Dt->{adVarWChar}
-      , $Dt->{adWChar}
-      ]
-    , DBI::SQL_WCHAR()         => [
-        $Dt->{adWChar}
-      , $Dt->{adVarWChar}
-      , $Dt->{adLongVarWChar}
-      ]
-    , DBI::SQL_WVARCHAR()      => [
-        $Dt->{adVarWChar}
-      , $Dt->{adLongVarWChar}
-      , $Dt->{adWChar}
-      ]
-    , DBI::SQL_WLONGVARCHAR()  => [
-        $Dt->{adLongVarWChar}
-      , $Dt->{adVarWChar}
-      , $Dt->{adWChar}
-      , $Dt->{adLongVarChar}
-      , $Dt->{adVarChar}
-      , $Dt->{adChar}
-      ]
-    );
-
-    my @sql_types = (
-      DBI::SQL_BINARY()
-    , DBI::SQL_BIT()
-    , DBI::SQL_CHAR()
-    , DBI::SQL_DATE()
-    , DBI::SQL_DECIMAL()
-    , DBI::SQL_DOUBLE()
-    , DBI::SQL_FLOAT()
-    , DBI::SQL_INTEGER()
-    , DBI::SQL_LONGVARBINARY()
-    , DBI::SQL_LONGVARCHAR()
-    , DBI::SQL_NUMERIC()
-    , DBI::SQL_REAL()
-    , DBI::SQL_SMALLINT()
-    , DBI::SQL_TIMESTAMP()
-    , DBI::SQL_TINYINT()
-    , DBI::SQL_VARBINARY()
-    , DBI::SQL_VARCHAR()
-    , DBI::SQL_WCHAR()
-    , DBI::SQL_WVARCHAR()
-    , DBI::SQL_WLONGVARCHAR()
-    );
-
-		# Get the Provider Types attributes.
-		my @sort_rows;
-		my %ct;
-		my $rs = $conn->OpenSchema( $ado_consts->{SchemaEnum}{adSchemaProviderTypes} );
-		return if DBD::ADO::Failed( $dbh,"OpenSchema error");
-
-		my $ado_fields = [ Win32::OLE::in( $rs->Fields ) ];
-		my $ado_info   = [ map { $_->Name } @$ado_fields ];
-
-		while ( !$rs->{EOF} ) {
-			# Sort by row
-			my $type_name = $rs->{TYPE_NAME}->{Value};
-			my $def;
-			push ( @sort_rows,  $def = join(' '
-			, $rs->{DATA_TYPE}->Value
-			, $rs->{BEST_MATCH}->Value || 0
-			, $rs->{IS_LONG}->Value || 0
-			, $rs->{IS_FIXEDLENGTH}->Value || 0
-			, $rs->{COLUMN_SIZE}->Value
-			, $rs->{TYPE_NAME}->Value
-			));
-			$dbh->trace_msg("    -- data type $type_name: $def\n", 5 );
-			@{$ct{$type_name}} = map { $rs->{$_}->Value || '' } @$ado_info;
-			$rs->MoveNext;
-		}
-		$rs->Close if $rs && $rs->State & $ado_consts->{ObjectStateEnum}{adStateOpen};
-		$rs = undef;
-		for my $t ( @sql_types ) {
-			# Attempt to work with LONG text fields.
-			# However for a LONG field, the order by ... isn't always the best pick.
-			# Loop through the rows looking for something with a IS LONG mark.
-			my $alt = join '|', @{$local_types{$t}};
-			my $re;
-			if    ( $t == DBI::SQL_LONGVARCHAR()   ) { $re = qr{^($alt)\s\d\s1\s0\s}  }
-			elsif ( $t == DBI::SQL_LONGVARBINARY() ) { $re = qr{^($alt)\s\d\s1\s0\s}  }
-			elsif ( $t == DBI::SQL_VARBINARY()     ) { $re = qr{^($alt)\s1\s\d\s0\s}  }
-			elsif ( $t == DBI::SQL_VARCHAR()       ) { $re = qr{^($alt)\s[01]\s0\s0\s}}
-			elsif ( $t == DBI::SQL_WVARCHAR()      ) { $re = qr{^($alt)\s[01]\s0\s0\s}}
-			elsif ( $t == DBI::SQL_WLONGVARCHAR()  ) { $re = qr{^($alt)\s\d\s1\s0\s}  }
-			elsif ( $t == DBI::SQL_CHAR()          ) { $re = qr{^($alt)\s\d\s0\s1\s}  }
-			elsif ( $t == DBI::SQL_WCHAR()         ) { $re = qr{^($alt)\s\d\s0\s1\s}  }
-			else                                     { $re = qr{^($alt)\s\d\s\d\s}    }
-
-			for ( sort { $b cmp $a } grep { /$re/ } @sort_rows ) {
-				my ($cc) = m/\d+\s+(\D\w?.*)$/;
-				Carp::carp "$cc does not exist in hash\n" unless exists $ct{$cc};
-				my @rec = @{$ct{$cc}};
-				$dbh->trace_msg("    ** Changing type $rec[1] -> $t : @rec\n", 6 );
-				$rec[1] = $t;
-				push @{$dbh->{ado_all_types_supported}}, \@rec;
-			}
-		}
-		$dbh->trace_msg("    <- ado_determine_type_support\n", 3 );
-		return \@{$dbh->{ado_all_types_supported}};
-	}
-
-
-  sub _ado_get_type_info_for {
-    my ($dbh, $AdoType, $IsFixed, $IsLong) = @_;
-
-    unless( $dbh->{ado_type_info_hash} ) {
-      my $sth = $dbh->func('adSchemaProviderTypes','OpenSchema');
-      while ( my $r = $sth->fetchrow_hashref ) {
-        push @{$dbh->{ado_type_info_hash}{$r->{DATA_TYPE}}{$r->{IS_FIXEDLENGTH}}{$r->{IS_LONG}}}, $r;
-      }
-    }
-    $dbh->{ado_type_info_hash}{$AdoType}{$IsFixed}{$IsLong} || [];
+    return ( $dbh->{ado_ti_ver} == 2 )
+    ? &DBD::ADO::TypeInfo::type_info_all_2
+    : &DBD::ADO::TypeInfo::type_info_all_1;
   }
 
 
@@ -1152,6 +882,7 @@
 
 		if ( $attrib eq 'Warn') {
 			$Win32::OLE::Warn = $value;
+			return $dbh->SUPER::STORE( $attrib, $value );
 		}
 		# If the provider supports transactions, then allow AutoCommit off.
 		if ( $attrib eq 'AutoCommit') {
@@ -1167,7 +898,7 @@
 		# Determine if this is one our expected parameters.
 		# If the attribute is all lower case, then it is a driver defined value.
 		# If mixed case, then it is a ADO defined value.
-		if ( $attrib =~ m/^ado_/ || exists $dbh->{$attrib} ) {
+		if ( $attrib =~ m/^ado_/) {
 			return $dbh->{$attrib} = $value;
 		} else {
 			unless( $attrib =~ /PrintError|RaiseError/) {
@@ -1441,10 +1172,12 @@
 
 		# print 'May Defer', join(', ', map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayDefer} ? 1 : 0 } @$ado_fields ), "\n";
 		# print 'Is Long  ', join(', ', map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldLong}     ? 1 : 0 } @$ado_fields ), "\n";
-
-		$sth->{ado_rowset} = $rs;
-		$sth->{ado_rownum} = 0;
-		$sth->{ado_rows}   = $rows;  # $rs->RecordCount
+    my $Attributes;
+       $Attributes |= $_->Attributes for @$ado_fields;
+		$sth->{ado_has_lob} = $Attributes & $ado_consts->{FieldAttributeEnum}{adFldLong} ? 1 : 0;
+		$sth->{ado_rowset}  = $rs;
+		$sth->{ado_rownum}  = 0;
+		$sth->{ado_rows}    = $rows;  # $rs->RecordCount
 
 		# We need to return a true value for a successful select
 		# -1 means total row count unavailable
@@ -1475,7 +1208,31 @@
     return if $rs->{EOF};
     return if DBD::ADO::Failed( $sth,'Fetch failed');
 
-    my @row = map { $_->Value } Win32::OLE::in( $rs->Fields );
+    my @row;
+    if ( $sth->{ado_has_lob} && $sth->FETCH('LongReadLen') < 2147483647 ) {
+      my $LongReadLen = $sth->FETCH('LongReadLen');
+      my $LongTruncOk = $sth->FETCH('LongTruncOk');
+      for ( Win32::OLE::in( $rs->Fields ) ) {
+        if ( $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldLong} ) {
+          if ( $LongReadLen == 0 ) {
+            push @row, undef;
+          } else {
+            my $ActualSize = $_->{ActualSize};
+            return if DBD::ADO::Failed( $sth,'ActualSize failed');
+            $sth->trace_msg("    -- ActualSize: $ActualSize, LongReadLen: $LongReadLen\n", 7 );
+            return $sth->set_err( -920,"LONG value truncated: $ActualSize > $LongReadLen")
+              if !$LongTruncOk && $ActualSize > $LongReadLen;
+            push @row, $_->GetChunk( $LongReadLen );
+            return if DBD::ADO::Failed( $sth,'GetChunk failed');
+          }
+        } else {
+          push @row, $_->Value;
+        }
+      }
+    }
+    else {
+      @row = map { $_->Value } Win32::OLE::in( $rs->Fields );
+    }
     # Jan Dubois jand@activestate.com addition to handle changes
     # in Win32::OLE return of Variant types of data.
     for ( @row ) {
@@ -1508,30 +1265,18 @@
     my ($sth, $attrib) = @_;
 
     return $sth->{$attrib} if exists $sth->{$attrib};
-
     return $sth->SUPER::FETCH( $attrib );
   }
 
 
-  # Allows adjusting different parameters in the command and connect objects.
-  my $change_affect = {
-    ado_commandtimeout => 'CommandTimeout'
-  };
-
   sub STORE {
     my ($sth, $attrib, $value) = @_;
 
-    # would normally validate and only store known attributes
-    if ( exists $sth->{$attrib} ) {
-      if ( exists $change_affect->{$attrib} ) {
-        # Only attempt to change the command if present.
-        if ( defined $sth->{ado_comm} ) {
-          $sth->{ado_comm}->{$change_affect->{$attrib}} = $value;
-          return if DBD::ADO::Failed( $sth,"Store change $attrib: $value");
-        }
-      }
-      return $sth->{$attrib} = $value;
+    if ( $attrib eq 'ado_commandtimeout' && defined $sth->{ado_comm} ) {
+      $sth->{ado_comm}{CommandTimeout} = $value;
+      return if DBD::ADO::Failed( $sth,"Store change $attrib: $value");
     }
+    return $sth->{$attrib} = $value if exists $sth->{$attrib};
     return $sth->SUPER::STORE( $attrib, $value );
   }
 
@@ -1698,8 +1443,6 @@ exists in your module search path which causes unwanted side effects when
 loaded.
 
 
-=head1 Enhanced DBI Methods
-
 =head2 prepare
 
 The B<prepare> methods allows attributes (see DBI):
@@ -1765,6 +1508,32 @@ As a last resort, you can provide an ADO-specific type, e.g.:
 
 If no type is given (neither by the provider nor by you), the datatype
 defaults to SQL_VARCHAR (adVarChar).
+
+
+=head2 Type info
+
+There exists two implementations of type_info_all(). Which version is
+used depends on the ado_ti_ver database handle attribute:
+
+=over
+
+=item C<$dbh-E<gt>{ado_ti_ver} = 1>
+
+The first implementations tries to find for various DBI types a set of
+ADO types supported by the provider. The algorithm is highly sophisticated.
+It tends to generate more duplicate type codes and names.
+
+=item C<$dbh-E<gt>{ado_ti_ver} = 2> (default)
+
+The second implementations is quite straightforward. It uses the set
+which the provider returns and tries to map various ADO codes to
+DBI/ODBC codes. The mapping is similar to the one used in column_info().
+Duplicate type codes and names tend to occur less often.
+The rows are ordered by DATA_TYPE, but not necessarily by 'how closely
+each type maps to the corresponding ODBC SQL data type'. This second
+sort criterion is difficult to achieve.
+
+=back
 
 
 =head2 table_info
@@ -1853,6 +1622,20 @@ Accepts any of the attributes described in the L<table_info> method:
   @names = $dbh->tables({ TABLE_TYPE => 'VIEW' });
 
 
+=head1 ADO specific attributes
+
+
+=head2 ado_commandtimeout (all handles, decimal, inherited)
+
+This attribute indicates the time (in seconds) after which a command is
+canceled.
+Typically, cancellation may occur during a long running C<execute> method.
+Not all ADO providers support this functionality.
+Whereas ADO's Command object doesn't inherit the Connection's CommandTimeout
+setting, DBD::ADO's statement handle is initialized with the ado_commandtimeout
+attribute of its associated database handle.
+
+
 =head1 Error handling
 
 An ADO provider may return a collection of more than one error. After
@@ -1879,6 +1662,36 @@ extracted from the errors collection. To avoid time-consuming processing
 of huge error collections, it defaults to 50.
 
 
+=head1 LOB support
+
+Since version 2.92, DBD::ADO supports the DBI handle attributes C<LongReadLen>
+and C<LongTruncOk>.
+C<LongReadLen> defaults to C<2147483647> (for backwards compatibility).
+
+For multibyte strings, it's unspecified whether C<LongReadLen> means I<bytes>
+or I<characters>. It's passed through to ADO's C<GetChunk> method and
+C<ActualSize> property.
+
+B<Caveat:> Unexpected truncation errors may occur if the ADO provider (e.g.
+Microsoft.Jet.OLEDB.4.0) uses I<bytes> for C<ActualSize> but I<characters>
+for C<GetChunk>.
+
+B<Caveat:> The ADO provider may have problems if the long field isn't the last
+one in the list of selected columns, e.g.:
+
+  Description : Catastrophic failure
+  HelpContext : 5000000
+     HelpFile :
+  NativeError :
+       Number : -2147418113
+       Source : Microsoft JET Database Engine
+     SQLState :
+
+The (experimental) C<blob_read> method ignores the C<$offset> argument for
+long fields (ADO maintains a I<current offset> internally). To ensure that
+C<blob_read> reads from the beginning, C<LongReadLen> must be set to C<0>.
+
+
 =head1 CAVEATS
 
 =head2 Character set
@@ -1895,31 +1708,6 @@ codepage:
 More detailed notes can be found at
 
   http://purl.net/stefan_ram/pub/perl_unicode_en
-
-=head2 Type info
-
-There exists two implementations of type_info_all(). Which version is
-used depends on the ado_ti_ver database handle attribute:
-
-=over
-
-=item C<$dbh-E<gt>{ado_ti_ver} = 1>
-
-The first implementations tries to find for various DBI types a set of
-ADO types supported by the provider. The algorithm is highly sophisticated.
-It tends to generate more duplicate type codes and names.
-
-=item C<$dbh-E<gt>{ado_ti_ver} = 2> (default)
-
-The second implementations is quite straightforward. It uses the set
-which the provider returns and tries to map various ADO codes to
-DBI/ODBC codes. The mapping is similar to the one used in column_info().
-Duplicate type codes and names tend to occur less often.
-The rows are ordered by DATA_TYPE, but not necessarily by 'how closely
-each type maps to the corresponding ODBC SQL data type'. This second
-sort criterion is difficult to achieve.
-
-=back
 
 
 =head1 AUTHORS

@@ -22,7 +22,7 @@ use DBI qw(:sql_types);
 
 use vars qw($VERSION $table_name %TestFieldInfo %LTestFieldInfo);
 
-$VERSION = '0.05';
+$VERSION = '0.06';
 $table_name = 'PERL_DBD_TEST';
 
 %TestFieldInfo = (
@@ -33,7 +33,7 @@ $table_name = 'PERL_DBD_TEST';
 );
 
 %LTestFieldInfo = (
- 'dt' => [SQL_TYPE_DATE, SQL_TYPE_TIMESTAMP, SQL_DATE, SQL_TIMESTAMP]
+ 'D' => [SQL_TYPE_DATE, SQL_TYPE_TIMESTAMP, SQL_DATE, SQL_TIMESTAMP]
 );
 
 sub get_type_for_column {
@@ -51,7 +51,6 @@ sub tab_create {
     $dbh->{PrintError} = $dbh->{RaiseError} = $dbh->{Warn} = 0;
     $dbh->do("DROP TABLE $tbl");
   }
-  # trying to use ADO to tell us what type of data to use, instead of the above.
   my $fields = undef;
   for my $f ( sort keys %TestFieldInfo ) {
     #print "# $f: @{$TestFieldInfo{$f}}\n";
@@ -83,7 +82,9 @@ sub tab_create {
 
 sub tab_delete {
   my $dbh = shift;
-  $dbh->do("DELETE FROM $table_name");
+  my $tbl = shift || $table_name;
+
+  $dbh->do("DELETE FROM $tbl");
 }
 
 sub tab_exists {
@@ -118,79 +119,65 @@ sub tab_exists {
 
 sub tab_long_create {
   my $dbh = shift;
-  my ($idx, $idx_type, $idx_num, $col_name, $lng_type, $type_num) = @_;
-  my $table_name = 'PERL_DBD_ADO_LONG';
+#$idx, $idx_type, $idx_num, $col_name, $lng_type,
+  my ($type_num) = @_;
+  my $tbl = $table_name; # 'PERL_DBD_ADO_LONG';
   {
-    local ($dbh->{PrintError});
-    $dbh->{PrintError} = 0;
-    $dbh->do("DROP TABLE $table_name");
+    local ($dbh->{PrintError}, $dbh->{RaiseError}, $dbh->{Warn});
+    $dbh->{PrintError} = $dbh->{RaiseError} = $dbh->{Warn} = 0;
+    $dbh->do("DROP TABLE $tbl");
   }
-  # trying to use ADO to tell us what type of data to use, instead of the above.
-  my $fields = undef;
-  my @row = $dbh->type_info( $idx_num );
-  $fields .= "$idx ";
-  shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/;
-  my $r = shift @row;
-  $fields .= $r->{TYPE_NAME};
-  if ($r->{CREATE_PARAMS}) {
-    $fields .= '(' . $r->{COLUMN_SIZE} . ')'
-    if $r->{CREATE_PARAMS} =~ /LENGTH/i;
-      $fields .= '(' . $r->{COLUMN_SIZE} . ', 0)'
-    if $r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
+  my $fields;
+  my $f;
+
+  $f = 'A';
+  $fields .= "$f ";
+  my @ti = get_type_for_column( $dbh, $f );
+  shift @ti if ($ti[0])->{TYPE_NAME} =~ /identity$/i;
+  my $ti = shift @ti;
+  $fields .= $ti->{TYPE_NAME};
+  if ($ti->{CREATE_PARAMS}) {
+    $fields .= '(' . $ti->{COLUMN_SIZE} . ')'
+      if $ti->{CREATE_PARAMS} =~ /LENGTH/i;
+    $fields .= '(' . $ti->{COLUMN_SIZE} . ', 0)'
+      if $ti->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
   }
 
   # Determine the "long" type here.
-  @row = $dbh->type_info( $type_num );
-  for my $rt ( @row ) {
-    next if $rt->{TYPE_NAME} =~ m/nclob/i;
-    next if $rt->{TYPE_NAME} =~ m/raw/i;
-    next if ($row[0])->{TYPE_NAME} =~ /identity$/i;
-    $fields .= ', ';
-    $fields .= "$col_name ";
-    $fields .= $rt->{TYPE_NAME};
-    if ($rt->{CREATE_PARAMS}) {
-      $fields .= '(' . $rt->{COLUMN_SIZE} . ')'
-        if $rt->{CREATE_PARAMS} =~ /LENGTH/i;
-      $fields .= '(' . $rt->{COLUMN_SIZE} . ', 0)'
-        if $rt->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
+  $f = 'C';
+  @ti = $dbh->type_info( $type_num );
+  for my $ti ( @ti ) {
+    next if $ti->{TYPE_NAME} =~ m/nclob/i;
+    next if $ti->{TYPE_NAME} =~ m/raw/i;
+    $fields .= ", $f ";
+    $fields .= $ti->{TYPE_NAME};
+    if ($ti->{CREATE_PARAMS}) {
+      $fields .= '(' . $ti->{COLUMN_SIZE} . ')'
+        if $ti->{CREATE_PARAMS} =~ /LENGTH/i;
+      $fields .= '(' . $ti->{COLUMN_SIZE} . ', 0)'
+        if $ti->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
     }
     last;
   }
 
   for my $f ( sort keys %LTestFieldInfo ) {
-    $fields .= ', ' unless !$fields;
-    $fields .= "$f ";
+    $fields .= ", $f ";
     print "# -- $fields\n";
-    @row = get_long_type_for_column($dbh, $f);
-    shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/;
+    my @ti = get_type_for_column( $dbh, $f );
+    shift @ti if ($ti[0])->{TYPE_NAME} =~ /identity$/i;
 
-    my $r = shift @row;
-    $fields .= $r->{TYPE_NAME};
-    if ( $r->{CREATE_PARAMS} ) {
-      $fields .= '(' . $r->{COLUMN_SIZE} . ')'
-        if $r->{CREATE_PARAMS} =~ /LENGTH/i;
-      $fields .= '(' . $r->{COLUMN_SIZE} . ', 0)'
-        if $r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
+    my $ti = shift @ti;
+    $fields .= $ti->{TYPE_NAME};
+    if ( $ti->{CREATE_PARAMS} ) {
+      $fields .= '(' . $ti->{COLUMN_SIZE} . ')'
+        if $ti->{CREATE_PARAMS} =~ /LENGTH/i;
+      $fields .= '(' . $ti->{COLUMN_SIZE} . ', 0)'
+        if $ti->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
     }
     print "# -- $fields\n";
   }
   print "# Using fields: $fields\n";
-  return $dbh->do("CREATE TABLE $table_name( $fields )");
-}
-
-sub get_long_type_for_column {
-  my $dbh = shift;
-  my $col = shift;
-
-  my @row;
-  for my $type ( @{$LTestFieldInfo{$col}} ) {
-    @row = $dbh->type_info( $type );
-    # may not correct behavior, but get the first compat type
-    #print "# Type $type rows: ", scalar(@row), "\n";
-    last if @row;
-  }
-  die "Unable to find a suitable test type for field $col" unless @row;
-  return @row;
+  return $dbh->do("CREATE TABLE $tbl( $fields )");
 }
 
 1;

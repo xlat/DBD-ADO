@@ -11,7 +11,7 @@ use ADOTEST();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 17;
+  plan tests => 16;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -24,10 +24,14 @@ pass('Database connection created');
 my $sth = $dbh->prepare("SELECT A FROM $ADOTEST::table_name");
 $sth->execute;
 
-eval {
-  my $val = $sth->{BadAttributeHere};
-};
-ok( $@,"Statement attribute BadAttributeHere: $@");
+# TODO:
+#
+# DBI 1.43: getting or setting an invalid attribute to no longer be
+#           a fatal error but generate a warning instead.
+#eval {
+#  my $val = $sth->{BadAttributeHere};
+#};
+#ok( $@,"Statement attribute BadAttributeHere: $@");
 
 my @attribs = qw{
 	NUM_OF_FIELDS NUM_OF_PARAMS NAME NAME_lc NAME_uc

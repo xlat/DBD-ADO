@@ -1,3 +1,22 @@
+2004-09-19  2.92
+
+  Enabled and reimplemented LOB tests (t/27lob.t, t/19misc.t).
+
+  Added support for LongReadLen/LongTruncOk.
+
+  Minor changes to the STORE() methods.
+
+  Moved more datatype related stuff into DBD::ADO::TypeInfo.
+
+  Implemented some timeout tests (t/29timeout.t).
+
+  Changed a test in t/14rows.t due to an API change in
+  Test::More 0.34 (is()'s undef/'' handling).
+
+  Removed the $sth->{BadAttributeHere} test from t/21sth.t,
+  because getting/setting an invalid attribute no longer is
+  a fatal error in DBI 1.43.
+
 2004-05-02  2.91
 
   Adjusted the trace levels in trace_msg().

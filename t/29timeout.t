@@ -1,39 +1,52 @@
-#!/usr/bin/perl -I./t
-# vim:ts=2:sw=2:ai:aw:nu:
+#!perl -I./t
+
 $| = 1;
-
-# XXX This file should be named XXtimeout.t.
-# XXX A separate XXXwarn.t would be useful.
-# XXX Is there a portable way to implement these tests?
-
-# Generate large number of test rows.
 
 use strict;
 use warnings;
 use DBI();
-#use Time::HiRes qw(gettimeofday tv_interval);
+use ADOTEST();
 
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-	plan tests => 3;
+  plan tests => 7;
 } else {
-	plan skip_all => 'Cannot test without DB info';
+  plan skip_all => 'Cannot test without DB info';
 }
 
-#use constant MAX_ROWS => 200;
+pass('Timeout tests');
 
-pass('Beginning test, modules loaded');
-
-my $att = { ado_commandtimeout => 20 };  # ado_cursortype => 'adOpenStatic'
-
-my $dbh = DBI->connect( $ENV{DBI_DSN}, $ENV{DBI_USER}, $ENV{DBI_PASS}, $att )
-  or die "Connect failed: $DBI::errstr\n";
+my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
-#my $sth = $dbh->prepare(q{select * from products});
-#ok( defined $sth, "Prepared select statement" );
-#$sth->execute;
-#$sth->dump_results;
+SKIP: {
+  skip('SQLOLEDB specific tests', 4 )
+    if $dbh->{ado_conn}{Provider} !~ /^SQLOLEDB/;
 
+  $dbh->{AutoCommit} = 0;
+
+  my $proc = $ADOTEST::table_name . '_WAIT';
+
+  my $sql = "CREATE PROCEDURE $proc AS waitfor delay '00:00:07'";
+
+  ok( $dbh->do( $sql ), $sql );
+
+  ok( $dbh->do( $proc ), $proc );
+
+  $dbh->{ado_commandtimeout} = 2;
+  $dbh->{RaiseError} = 1;
+  $dbh->{PrintError} = 0;
+  $dbh->{Warn}       = 0;
+
+  my $rc = eval { $dbh->do( $proc ) };
+  ok(!$rc,"$proc (timeout=$dbh->{ado_commandtimeout})");
+  like( $@, qr/HYT00/,'Error expected: HYT00');
+
+  # TODO: uninitialized ... Why?
+  #like( $dbh->errstr, qr/Timeout expired/, "Error expected: Timeout expired");  # language dependent?
+  #like( $dbh->errstr, qr/HYT00/          ,'Error expected: HYT00');
+  #is  ( $dbh->state ,'HYT00'             ,'SQLState');
+  #is  ( $dbh->err   , -2147217871        ,'Error Number'); # 0x80040E31
+}
 ok( $dbh->disconnect,'Disconnect');

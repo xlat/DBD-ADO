@@ -10,7 +10,7 @@ use ADOTEST();
 use Test::More;
 
 if ( defined $ENV{DBI_DSN} ) {
-  plan tests => 23;
+  plan tests => 22;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -29,20 +29,16 @@ pass('Database connection created');
 my $rc = 0;
 
 ok( $rc = ADOTEST::tab_create( $dbh ),'Create test table');
-ok( $rc = ADOTEST::tab_exists( $dbh ),'Check existance of test table');
 
 ok( $rc = tab_insert( $dbh ),'Insert test data');
 ok( $rc = tab_select( $dbh ),'Select test data');
 
-TODO: {
-  local $TODO = 'LongReadLen Not Supported Yet';
-  $dbh->{LongReadLen} = 50;
-  $dbh->{LongTruncOk} = 1;
-  is( select_long( $dbh ), 1, 'Test LongTruncOk ON');
+$dbh->{LongReadLen} = 50;
+$dbh->{LongTruncOk} = 1;
+is( select_long( $dbh ), 1, 'Test LongTruncOk ON');
 
-  $dbh->{LongTruncOk} = 0;
-  is( select_long( $dbh ), 0, 'Test LongTruncOk OFF');
-}
+$dbh->{LongTruncOk} = 0;
+is( select_long( $dbh ), 0, 'Test LongTruncOk OFF');
 
 #
 # some ADO drivers will prepare this OK, but not execute.
@@ -132,8 +128,6 @@ sub tab_select
 {
   my $dbh = shift;
   my $rowcount = 0;
-
-  $dbh->{LongReadLen} = 1000;
 
   my $sth = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A")
     or return undef;
@@ -228,7 +222,8 @@ sub select_long
   my $dbh = shift;
   my $rc = 0;
 
-  $dbh->{RaiseError} = 1;
+  local $dbh->{RaiseError} = 1;
+  local $dbh->{PrintError} = 0;
   my $sth = $dbh->prepare("SELECT A,C FROM $ADOTEST::table_name WHERE A=4");
   if ( $sth ) {
     $sth->execute;

@@ -10,7 +10,7 @@ use ADOTEST();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 33;
+  plan tests => 32;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -30,7 +30,6 @@ my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
 pass('Database connection created');
 
 ok( ADOTEST::tab_create( $dbh ),"CREATE TABLE $ADOTEST::table_name");
-ok( ADOTEST::tab_exists( $dbh ),"Check existance of table $ADOTEST::table_name");
 
 ok( tab_insert( $dbh ),'Insert test data');
 ok( tab_select( $dbh ),'Select test data');
@@ -127,8 +126,6 @@ sub tab_select  # similar to 02simple.t
 {
   my $dbh = shift;
   my $rowcount = 0;
-
-  $dbh->{LongReadLen} = 1000;
 
   my $sth = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A")
     or return undef;

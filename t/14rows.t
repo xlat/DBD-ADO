@@ -68,7 +68,7 @@ SQL
 my $sth = $dbh->prepare( $sql );
 ok( defined $sth,'Prepared insert select statement');
 my $rc = $sth->execute;
-is( ref $rc, undef,"Not a Win32::OLE::Variant (or other) object?");
+ok( !ref $rc,"Not a Win32::OLE::Variant (or other) object?");
 is( $rc, $MAX_ROWS,"Execute returned $MAX_ROWS rows");
 is( $sth->rows, $rc,"Execute sth->rows returned $rc");
 
