@@ -1,4 +1,8 @@
 
+Changes Version 2.71: 2003-08-31
+
+	New maintainer: Steffen Goeldner <sgoeldner@cpan.org>.
+
 Changes Version 2.7: Thu Aug 21 23:10:50 EDT 2003
 
 	Bug fix from Yimin Zheng regarding undef/null values passed as
@@ -254,8 +258,10 @@ ADO
       http://www.microsoft.com/Data/download.htm
 
 AUTHORS
-    Phlip and Tim Bunce. With many thanks to Jan Dubois, Jochen Wiedmann and
-    Thomas Lowery for additions, debuggery and general help.
+    Phlip and Tim Bunce. With many thanks to Jan Dubois and Jochen Wiedmann
+    for additions, debuggery and general help.
+    Special thanks to Thomas Lowery, who maintained this module 2001-2003.
+    Current maintainer is Steffen Goeldner.
 
 SEE ALSO
     ADO Reference book: ADO 2.0 Programmer's Reference, David Sussman and

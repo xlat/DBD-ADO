@@ -10,14 +10,14 @@
 		use vars qw($err $errstr $state $drh $VERSION @EXPORT);
 
     @EXPORT = ();
-    $VERSION = (qw$Revision: 2.7 $)[1];
+    $VERSION = '2.71';
 
-
-#   $Id: ADO.pm,v 2.7 2003/08/22 03:41:10 talowery Exp $
 #
 #   Copyright (c) 1999, Phlip & Tim Bunce
-#   Copyright (c) 2000, Phlip   Tim Bunce, and Thomas Lowery
-#   Copyright (c) 2001, Philp,  Tim Bunce, and Thomas Lowery
+#   Copyright (c) 2000, Phlip & Tim Bunce, and Thomas Lowery
+#   Copyright (c) 2001, Philp & Tim Bunce, and Thomas Lowery
+#   Copyright (c) 2002, Philp & Tim Bunce, and Thomas Lowery
+#   Copyright (c) 2003, Philp & Tim Bunce, Thomas Lowery and Steffen Goeldner
 #
 #   You may distribute under the terms of either the GNU General Public
 #   License or the Artistic License, as specified in the Perl README file.
@@ -34,7 +34,7 @@
         ($drh) = DBI::_new_drh($class, {
             'Name' 				=> 'ADO',
             'Version' 		=> $VERSION,
-            'Attribution' => 'DBD ADO for Win32 by Phlip, Tim Bunce, and Thomas Lowery',
+            'Attribution' => 'DBD ADO for Win32 by Phlip, Tim Bunce, Thomas Lowery and Steffen Goeldner',
 						'Err' 				=> \$DBD::ADO::err,
 						'Errstr' 			=> \$DBD::ADO::errstr,
 						'State' 			=> \$DBD::ADO::state,
@@ -2441,8 +2441,10 @@ It is strongly recommended that you use the latest version of ADO
 
 =head1 AUTHORS
 
-Phlip and Tim Bunce. With many thanks to Jan Dubois, Jochen Wiedmann
-and Thomas Lowery for additions, debuggery and general help.
+Phlip and Tim Bunce. With many thanks to Jan Dubois and Jochen Wiedmann
+for additions, debuggery and general help.
+Special thanks to Thomas Lowery, who maintained this module 2001-2003.
+Current maintainer is Steffen Goeldner.
 
 =head1 SEE ALSO
 
