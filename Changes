@@ -1,4 +1,13 @@
 
+Changes Version 2.74: 2003-10-12
+
+	Improved prepare/bind_param/execute for providers which
+	fail to parse placeholders correctly.
+
+	Modified t/05meth.t to use Test::More.
+
+	Rearranged some tests.
+
 Changes Version 2.73: 2003-10-05
 
 	Modified t/17conn.t to avoid an error message on stderr.
@@ -44,7 +53,7 @@ Changes Version 2.7: Thu Aug 21 23:10:50 EDT 2003
 	Bug fix from Yimin Zheng regarding undef/null values passed as
 	parameters to bind_param and/or execute
 	Thanks Yimin.
-	
+
 	Enhancement to Meta Data support from Steffen Goeldner.
 	Thanks Steffen.
 
@@ -61,9 +70,9 @@ Changes Version 2.6:  So what happened to the notes for 2.6?
 Changes Version 2.5: Mon  Apr 8, 2002  23:00:39
 
 	Bug fix from Jacqui Caren <jacqui.caren@ig.co.uk>, apply to bind image.
-	
+
 	Meta Data support from Steffen Goeldner.
-		Includes: 
+		Includes:
 			get_info
 			Improved table_info
 			column_info
@@ -71,14 +80,15 @@ Changes Version 2.5: Mon  Apr 8, 2002  23:00:39
 			foreign_key_info
 			Improved ADO to ODBC type conversions.
 
-	package DBD::ADO::TypeInfo from Steffen Goeldner, however 
+	package DBD::ADO::TypeInfo from Steffen Goeldner, however
 	none of the current code is using this package, yet.
 
 	Remove temp constants needed until DBI support SQL_* values.
 
-	Added more tests.  
+	Added more tests.
 
 Changes Version 2.4: Tue Oct 23 23:25:42 EDT 2001
+
 	Patch for supporting primary_key_info from Steffen Goeldner <sgoeldner@cpan.org>
 		Thanks Steffen!
 	Bug in function call to openschema from Steffen Goeldner <sgoeldner@cpan.org>
@@ -90,10 +100,60 @@ Changes Version 2.4: Tue Oct 23 23:25:42 EDT 2001
 	Modified most of the tests to use Test::More.
 
 Changes Version 2.1: Sat May 26 07:51:19 EDT 2001
+
 	First CPAN release apart from DBI.
 	Version number correction.
 	Patch from Simon Oliver:  Warning messages from undefined values.
 
-New maintainer: Thomas Lowery tlowery@stlowery.com
-When emailing, make sure to include ADO in the subject line.
+  New maintainer: Thomas Lowery <tlowery@stlowery.com>
+  When emailing, make sure to include ADO in the subject line.
 
+-------------------------------------------------------------------------------
+
+2001-08-24  1.20
+
+  Removed (unbundled) DBD::ADO from the DBI distribution.
+
+2001-05-29  1.16
+
+  Improvements in error handling from Thomas Lowery.
+
+2001-03-30  1.15
+
+  Many enhancements thanks to Thomas Lowery.
+
+2000-06-11  1.14
+
+  Added table_info() thanks to Thomas Lowery.
+
+  Improved type_info_all() thanks to Thomas Lowery.
+
+1999-07-12  1.13
+
+  Improved data fetch performance.
+
+  Added GetTypeInfo() thanks to Thomas Lowery.
+
+1999-06-29  1.12
+
+  Fixed significant bug (fetch skipped first row).
+
+1999-06-17  1.11
+
+  Fixed missing namespace (qualified Variant() with Win32::OLE).
+
+1999-05-26  1.09
+
+  Added variable to precompute VT_I4 | VT_BYREF.
+
+1999-05-13  1.08
+
+  Many enhancements thanks to Phlip and others.
+
+1999-01-04  1.05
+
+  Improved connect() thanks to Phlip.
+
+1999-01-01  1.03
+
+  First (very experimental) public release as part of DBI.

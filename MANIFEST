@@ -19,11 +19,11 @@ t/09null.t
 t/11curs.t
 t/15func.t
 t/17conn.t
-t/17ddtbl.t
-t/19ddpk.t
 t/21large.t
 t/22rows.t
-t/23ddcol.t
 t/23warn.t
+t/41ddtbl.t
+t/42ddcol.t
+t/43ddpk.t
 t/ADOTEST.pm
 META.yml                                Module meta-data (added by MakeMaker)

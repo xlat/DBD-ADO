@@ -2,98 +2,87 @@
 
 $| = 1;
 
-use DBI;
 use strict;
+use warnings;
+use DBI();
 
-unless (defined $ENV{DBI_DSN}) {
-	$::tests = 0;
-	exit;
+use Test::More;
+
+if (defined $ENV{DBI_DSN}) {
+  plan tests => 6;
+} else {
+  plan skip_all => 'Cannot test without DB info';
 }
 
-print "1..$::tests\n";
+pass('Beginning test, modules loaded');
 
-my @row;
-
-print "ok 1\n";
-
-my $dbh = DBI->connect() || die "Connect failed: $DBI::errstr\n";
-print "ok 2\n";
+my $dbh = DBI->connect or die "Connect failed: $DBI::errstr\n";
+pass('Database connection created');
 
 #### testing Tim's early draft DBI methods #'
 
-my $r1 = $DBI::rows;
 $dbh->{AutoCommit} = 0;
 my $sth;
-$sth = $dbh->prepare( qq{INSERT INTO PERL_DBD_TEST(A,B) VALUES( 10, 'Stuff here')});
-$sth->execute();
-$sth->finish;
-$sth = $dbh->prepare("DELETE FROM PERL_DBD_TEST");
-$sth->execute();
+
+$dbh->do(q(INSERT INTO PERL_DBD_TEST( A, B ) VALUES( 10,'Stuff here')));
+
+$sth = $dbh->prepare('DELETE FROM PERL_DBD_TEST');
+$sth->execute;
 my $s = $sth->rows;
 my $t = $DBI::rows;
-print "not " unless($s >= 0 
-		    && $t == $s);
-$sth->finish();
-$dbh->rollback();
-print "ok 3\n";
-print "sth->rows: $s DBI::rows: $t\n";
+is( $s, $t,"sth->rows: $s DBI::rows: $t");
+
+$dbh->rollback;
 
 $sth = $dbh->prepare('SELECT * FROM PERL_DBD_TEST WHERE 1 = 0');
-$sth->execute();
-@row = $sth->fetchrow();
-if ($sth->err)
-    {
-    print ' $sth->err: ', $sth->err, "\n";
-    print ' $sth->errstr: ', $sth->errstr, "\n";
-    print ' $dbh->state: ', $dbh->state, "\n";
-#    print ' $sth->state: ', $sth->state, "\n";
-    }
-$sth->finish();
-print "ok 4\n";
+$sth->execute;
+my @row = $sth->fetchrow;
+if ( $sth->err ) {
+  print ' $sth->err   : ', $sth->err   , "\n";
+  print ' $sth->errstr: ', $sth->errstr, "\n";
+  print ' $dbh->state : ', $dbh->state , "\n";
+# print ' $sth->state : ', $sth->state , "\n";
+}
+pass("Fetched empty result set: (@row)");
 
-my ($a, $b);
-$sth = $dbh->prepare('SELECT A,B FROM PERL_DBD_TEST');
-$sth->execute();
-while (@row = $sth->fetchrow())
-    {
-    print " \@row     a,b:", $row[0], ",", $row[1], "\n";
-    }
-$sth->finish();
+$sth = $dbh->prepare('SELECT A, B FROM PERL_DBD_TEST');
+$sth->execute;
+while ( my $row = $sth->fetch ) {
+  print ' @row     a,b:', $row->[0], ',', $row->[1], "\n";
+}
 
-$sth->execute();
-$sth->bind_col(1, \$a);
-$sth->bind_col(2, \$b);
-while ($sth->fetch())
-    {
-    print " bind_col a,b:", $a, ",", $b, "\n";
-    unless (defined($a) && defined($b))
-    	{
-	print "not ";
-	last;
-	}
-    }
-print "ok 5\n";
-$sth->finish();
+my $Ok;
+$Ok = 1;
+my ( $a, $b );
+$sth->execute;
+$sth->bind_col( 1, \$a );
+$sth->bind_col( 2, \$b );
+while ( $sth->fetch ) {
+  print ' bind_col a,b:', $a, ',', $b, "\n";
+  unless ( defined( $a ) && defined( $b ) ) {
+    $Ok = 0;
+    $sth->finish;
+    last;
+  }
+}
+is( $Ok, 1, 'All fields defined');
 
-($a, $b) = (undef, undef);
-$sth->execute();
-$sth->bind_columns(undef, \$b, \$a);
-while ($sth->fetch())
-    {
-    print " bind_columns a,b:", $b, ",", $a, "\n";
-    unless (defined($a) && defined($b))
-    	{
-	print "not ";
-	last;
-	}
-    }
-print "ok 6\n";
-
-$sth->finish();
+$Ok = 1;
+( $a, $b ) = ( undef, undef );
+$sth->execute;
+$sth->bind_columns( undef, \$b, \$a );
+while ( $sth->fetch )
+{
+  print ' bind_columns a,b:', $b, ',', $a, "\n";
+  unless ( defined( $a ) && defined( $b ) ) {
+    $Ok = 0;
+    $sth->finish;
+    last;
+  }
+}
+is( $Ok, 1, 'All fields defined');
 
 # turn off error warnings.  We expect one here (invalid transaction state)
 $dbh->{RaiseError} = 0;
 $dbh->{PrintError} = 0;
-$dbh->disconnect();
-
-BEGIN { $::tests = 6; }
+$dbh->disconnect;

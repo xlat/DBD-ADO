@@ -2,15 +2,14 @@
 # vim:ts=2:sw=2:ai:aw:nu
 
 {
-    package DBD::ADO;
+  package DBD::ADO;
 
-    require DBI;
-    require Carp;
-    use strict;
-    use vars qw($err $errstr $state $drh $VERSION @EXPORT);
+  require DBI;
+  require Carp;
+  use strict;
+  use vars qw($err $errstr $state $drh $VERSION);
 
-    @EXPORT = ();
-    $VERSION = '2.73';
+  $VERSION = '2.74';
 
 # Copyright (c) 1998, Tim Bunce
 # Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
@@ -22,10 +21,10 @@
 # You may distribute under the terms of either the GNU General Public
 # License or the Artistic License, as specified in the Perl README file.
 
-    $drh = undef;       # holds driver handle once initialised
-    $err = 0;           # The $DBI::err value
-		$errstr = "";
-		$state = "";
+  $drh = undef;       # holds driver handle once initialised
+  $err = 0;           # The $DBI::err value
+  $errstr = "";
+  $state = "";
 
     sub driver{
         return $drh if $drh;
@@ -64,7 +63,7 @@
 				my $err;
 				foreach $err (Win32::OLE::in($Errors)) {
 	    		next if $err->{Number} == 0; # Skip warnings
-	    		push(@$err_ary
+	    		push(@$err_ary, "\n"
 						, qq{\tDescription:\t} . ($err->{Description}||q{})
 	    			, qq{\tHelpContext:\t} . ($err->{HelpContext}||q{})
 						, qq{\tHelpFile:   \t} . ($err->{HelpFile}||q{})
@@ -506,9 +505,6 @@ my @sql_types_supported = ();
 			my $conn = $dbh->{ado_conn};
 			my $ado_consts = $dbh->{ado_consts};
 
-
-			$dbh->trace_msg( "-> create a new statement handler\n");
-
 			my $comm = Win32::OLE->new('ADODB.Command');
 			my $lastError = Win32::OLE->LastError;
 			return DBI::set_err($dbh, $DBD::ADO::err,
@@ -563,7 +559,6 @@ my @sql_types_supported = ();
 
 			$outer->STORE( LongReadLen	=> 0 );
 			$outer->STORE( LongTruncOk	=> 0 );
-			$outer->STORE( NUM_OF_PARAMS=> 0 );
 
 			if (exists $attribs->{RowsInCache}) {
 				$outer->STORE( RowsInCache	=> $attribs->{RowsInCache} );
@@ -599,7 +594,7 @@ my @sql_types_supported = ();
 
 			# Set overrides for and attributes.
 			foreach my $key (grep { /^ado_/ } keys %$attribs) {
-				$sth->trace_msg( "  Attribute $key Value " . $attribs->{$key} );
+				$sth->trace_msg("    -- Attribute: $key => $attribs->{$key}\n");
 				if ( exists $sth->{$key} ) {
 					$sth->{$key} = $attribs->{$key};
 				} else {
@@ -607,78 +602,43 @@ my @sql_types_supported = ();
 				}
 			}
 
-#			Determine if Refresh is supported.  If the call returns
-#			an error, then Parameters->Refresh is not supported.
-			if ($sth->{ado_refresh}) {
-				eval {
-					local $Win32::OLE::Warn = 0;
-					$comm->Parameters->Refresh();
-					$lastError = DBD::ADO::errors($conn);
-					die $lastError if $lastError;
-				};
-				 $sth->{ado_refresh} = 0 if $@;
-			}
+      my $Cnt;
+      if ( $sth->{ado_refresh} == 1 ) {
+        # Refresh() is - among other things - useful to detect syntax errors.
+        # The eval block is used because Refresh() may not be supported (but
+        # no such case is known).
+        # Buggy drivers, e.g. FoxPro, may leave the Parameters collection
+        # empty, without returning an error. Then _refresh() is defered until
+        # bind_param() is called.
+        eval {
+          local $Win32::OLE::Warn = 0;
+          $comm->Parameters->Refresh;
+          $Cnt = $comm->Parameters->Count;
+        };
+        $lastError = DBD::ADO::errors( $conn );
+        if ( $lastError ) {
+          $dbh->trace_msg("    !! Refresh error: $lastError\n", 4 );
+          $sth->{ado_refresh} = 2;
+        }
+      }
+      if ($sth->{ado_refresh} == 2 ) {
+        $Cnt = DBD::ADO::st::_refresh( $outer );
+      }
+      if ( $Cnt ) {
+        # Describe the Parameters:
+        for my $p ( Win32::OLE::in( $comm->Parameters ) ) {
+          my @p = map "$_ => $p->{$_}", qw(Name Type Direction Size);
+          $dbh->trace_msg("    -- Parameter: @p\n", 4 );
+        }
+        $outer->STORE('NUM_OF_PARAMS' => $Cnt );
+      }
+      $comm->{Prepared} = 1;
+      $lastError = DBD::ADO::errors( $conn );
+      return $dbh->set_err( $DBD::ADO::err || -1,
+        "Unable to set prepared 'ADODB.Command': $lastError")
+        if $lastError;
 
-			if ($sth->{ado_refresh} == 0) {
-				$outer->STORE( 'NUM_OF_PARAMS', _params($statement));
-				my $params = $sth->FETCH( 'NUM_OF_PARAMS');
-				if ($params > 0) {
-					for ( 0 .. ($params - 1)) {
-						my $parm =
-							$comm->CreateParameter("$_",
-								$ado_consts->{adVarChar},
-								$ado_consts->{adParamInput},
-								1,
-								"");
-						my $lastError = DBD::ADO::errors($conn);
-						return $sth->DBI::set_err( $DBD::ADO::err,
-		  				"Unable to CreateParameter: $lastError")
-	    			if $lastError;
-
-						$comm->Parameters->Append($parm);
-						$lastError = DBD::ADO::errors($conn);
-						return $sth->DBI::set_err( $DBD::ADO::err,
-		  				"Append parameter failed : $lastError")
-	    			if $lastError;
-					}
-				} else {
-					$sth->trace_msg("\t-> prepare: statement contains no parameters\n");
-				}
-			} else {
-				$outer->STORE( 'NUM_OF_PARAMS' => $comm->Parameters->Count );
-				$sth->{ado_refresh} = 1;
-#				Describe the Parameters.
-				if ($comm->Parameters->Count) {
-				my $cnt = 0;
-				while ($cnt < $comm->Parameters->Count) {
-					my $x = $comm->Parameters->Item($cnt);
-					$dbh->trace_msg( "-> parameter : Name: " .
-						$x->{Name} .
-						" Type: " .
-						$x->{Type} .
-						" Direction: " .
-						$x->{Direction} .
-						" Size: " .
-						$x->{Size} .
-						"\n");
-						$cnt++;
-				}
-					$sth->trace_msg( "<-paramters: " );
-				} else {
-						$sth->trace_msg("\t-> prepare: statement contains no parameters\n");
-				}
-			}
-
-#			Only preparing a statement if it contains parameters.
-			$comm->{Prepared} = 1;
-			$lastError = DBD::ADO::errors($conn);
-			return DBI::set_err($dbh, $DBD::ADO::err,
-				"Unable to set prepared 'ADODB.Command': $lastError")
-	    if $lastError;
-
-			$dbh->trace_msg( "<- created a new statement handler\n");
-
-			return $outer;
+      return $outer;
     } # prepare
 		#
 		# Creates a Statement handle from a row set.
@@ -741,20 +701,6 @@ my @sql_types_supported = ();
 			$dbh->trace_msg( "<- _rs_sth_prepare: Create statement handle from RecordSet\n" );
 		return $outer;
     } # _rs_sth_prepare
-
-
-	# Determine the number of parameters, if Refresh fails.
-	sub _params
-	{
-		my $sql = shift;
-		use Text::ParseWords;
-		$^W = 0;
-		$sql =~ s/\n/ /;
-			my $rtn = join( " ", grep { m/\?/ }
-				grep { ! m/^['"].*\?/ } &quotewords('\s+', 1, $sql));
-		my $cnt = ($rtn =~ tr /?//) || 0;
-		return $cnt;
-	}
 
 	sub get_info {
 		my($dbh, $info_type) = @_;
@@ -1677,18 +1623,57 @@ my @sql_types_supported = ();
 			return( (defined($str) and length($str))? $str: "" );
 		}
 
+  # Determine the number of parameters, if Refresh fails.
+  sub _params
+  {
+    my $sql = shift;
+    use Text::ParseWords;
+    $^W = 0;
+    $sql =~ s/\n/ /;
+    my $rtn = join( " ", grep { m/\?/ }
+      grep { ! m/^['"].*\?/ } &quotewords('\s+', 1, $sql));
+    my $cnt = ($rtn =~ tr /?//) || 0;
+    return $cnt;
+  }
+
+  sub _refresh {
+    my ( $sth ) = @_;
+    $sth->trace_msg("    -> _refresh\n", 5 );
+    my $conn = $sth->{ado_conn};
+    my $comm = $sth->{ado_comm};
+    my $ado_consts = $sth->{ado_dbh}->{ado_consts};
+
+    my $Cnt = _params( $sth->FETCH('Statement') );
+
+    for ( 0 .. $Cnt - 1 ) {
+      my $Parameter = $comm->CreateParameter("$_",
+        $ado_consts->{adVarChar},
+        $ado_consts->{adParamInput},
+        1,
+        "");
+      my $lastError = DBD::ADO::errors( $conn );
+      return $sth->DBI::set_err( $DBD::ADO::err,
+        "Unable to CreateParameter: $lastError") if $lastError;
+
+      $comm->Parameters->Append( $Parameter );
+      $lastError = DBD::ADO::errors( $conn );
+      return $sth->DBI::set_err( $DBD::ADO::err,
+        "Append parameter failed : $lastError") if $lastError;
+    }
+    $sth->STORE('NUM_OF_PARAMS', $Cnt );
+    $sth->trace_msg("    <- _refresh\n", 5 );
+    return $Cnt;
+  }
+
 		sub bind_param {
 			my ($sth, $pNum, $val, $attr) = @_;
 			my $conn = $sth->{ado_conn};
 			my $comm = $sth->{ado_comm};
 			my $ado_consts = $sth->{ado_dbh}->{ado_consts};
 
-	    my $param_cnt = $sth->FETCH( 'NUM_OF_PARAMS' );
-			return DBI::set_err($sth, $DBD::ADO::err,
-				"Bind Parameters called with no parameters defined!")
-	    unless $param_cnt;
+      my $param_cnt = $sth->FETCH('NUM_OF_PARAMS') || _refresh( $sth );
 
-			return DBI::set_err($sth, $DBD::ADO::err,
+			return $sth->set_err( -1,
 				"Bind Parameter $pNum outside current range of $param_cnt.")
 	    if ($pNum > $param_cnt or $pNum < 1);
 
@@ -1696,19 +1681,19 @@ my @sql_types_supported = ();
 			my $type = (ref $attr) ? $attr->{TYPE}: $attr;
 
 			# Convert from ODBC to ADO type
-			my $aType = &_convert_type($type);
+			my $aType = &_convert_type($type) if $type;
 			my $pd;
 
 			my $params = $sth->{ado_params};
 			$params->[$pNum-1] = $val;
 			my $p = $comm->Parameters;
-#			Determine if the Parameter is defined.
+      # Determine if the Parameter is defined.
 			my $i = $p->Item( $pNum -1 );
 			if (defined($val)) {
 				if ($i->{Type} == $ado_consts->{adVarBinary} or
 						$i->{Type} == $ado_consts->{adLongVarBinary}
 				) {
-#						Deal with an image request.
+          # Deal with an image request.
 					my $sz = length $val;
 					#my $pic2 = Variant(VT_UI1|VT_ARRAY,$i->{Size});
 					my $pic = Variant(VT_UI1|VT_ARRAY,$sz + 10);
@@ -1716,8 +1701,8 @@ my @sql_types_supported = ();
 					$i->{Value} = $pic;
 					$sth->trace_msg( "->(VarBinary) : ". $i->Size. " ". $i->Type. "\n");
 				} else {
-					$i->{Size} = $val? length $val: $aType->[2];
-					$i->{Value} = $val if $val;
+					$i->{Size}  = length $val;  # $val? length $val: $aType->[2];
+					$i->{Value} = $val;         # $val if $val;
 					$sth->trace_msg( "->(default) : ". $i->Size. " ". $i->Type. "\n");
 				}
 			} else {
@@ -1757,6 +1742,9 @@ my @sql_types_supported = ();
 			# If the application is excepting arguments, then
 			# process them here.
 			#
+      for ( 1 .. @bind_values ) {
+        $sth->bind_param( $_, $bind_values[$_-1] ) or return;
+      }
 
 			my $lastError;
 
@@ -1786,37 +1774,7 @@ my @sql_types_supported = ();
 
 			# Remember if the provider errored with a "not supported" message.
 
-			return DBI::set_err( $sth, $DBD::ADO::err,
-		  		"Bind params passed without place holders")
-	    if (@bind_values and $p->{Count} == 0);
-
 			my $x = 0;
-			# Convert the parameters as needed.
-			for (@bind_values) {
-				my $i = $p->Item($x);
-				if (defined($_)) {
-					# Fix from Jacqui Caren <jacqui.caren@ig.co.uk>,
-					if ($i->{Type} == $ado_consts->{adVarBinary} or
-						$i->{Type} == $ado_consts->{adLongVarBinary}
-					) {
-#						Deal with an image request.
-					my $sz = length $_;
-					#my $pic = Variant(VT_UI1|VT_ARRAY,$i->{Size});
-					my $pic = Variant(VT_UI1|VT_ARRAY,$sz + 10);
-					$pic->Put($_);
-					$i->{Value} = $pic;
-					} else {
-						$i->{Size} = length $_;
-						$i->{Value} = $_;
-					}
-				} else {
-						$i->{Value} = Variant(VT_NULL);
-				}
-			$sth->trace_msg("-> Bind parameter (execute): " . $i->Type . "\n");
-				$x++;
-			}
-
-			$x = 0;
 
 			# If the provider errored with not_supported above in the Parameters
 			# methods, do not attempt to display anything about the object.  If we
