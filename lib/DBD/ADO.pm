@@ -4,12 +4,12 @@
 {
   package DBD::ADO;
 
-  require DBI;
-  require Carp;
   use strict;
-  use vars qw($VERSION  $drh $err $errstr $state);
+  use DBI();
+  use Win32::OLE();
+  use vars qw($VERSION $drh $err $errstr $state);
 
-  $VERSION = '2.80';
+  $VERSION = '2.81';
 
 # Copyright (c) 1998, Tim Bunce
 # Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
@@ -75,10 +75,9 @@
 
 { package DBD::ADO::dr; # ====== DRIVER ======
 
-	use strict;
-	use DBI qw(:sql_types);
-	require Win32::OLE;
-	require Win32::OLE::Variant;
+  use strict;
+  use DBI();
+  use Win32::OLE();
 
   $DBD::ADO::dr::imp_data_size = 0;
 
@@ -120,7 +119,6 @@
 		},
 		{
 		  ado_conn						=> undef
-		, ado_types_supported	=> undef
 		, ado_cursortype			=> undef
 		, ado_commandtimeout	=> undef
 		, Attributes					=> undef
@@ -217,6 +215,7 @@
 		$drh->trace_msg( "->> Transaction support: $auto " .
 			$this->{ado_provider_auto_commit_comments} . "\n",1);
 
+    $outer->STORE('Active', 1 );
 		return $outer;
 	}
 
@@ -269,15 +268,16 @@ my $sch_dbi_to_ado = {
 	DATE_MODIFIED => 'DATE_MODIFIED',
 	};
 
-my @sql_types_supported = ();
 
 { package DBD::ADO::db; # ====== DATABASE ======
 
-	use Carp;
-	use strict;
-	require Win32::OLE::Variant;
+  use strict;
+  use DBI();
+  use Win32::OLE();
+  use Win32::OLE::Variant();
   use DBD::ADO::TypeInfo();
   use DBD::ADO::Const();
+  use Carp();
 
   $DBD::ADO::db::imp_data_size = 0;
 
@@ -287,9 +287,9 @@ my @sql_types_supported = ();
 	sub rollback {
 		my($dbh) = @_;
 
-		return carp "Rollback ineffective when AutoCommit is on\n"
+		return Carp::carp "Rollback ineffective when AutoCommit is on\n"
 			if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
-		return carp $dbh->{ado_provider_auto_commit_comments}
+		return Carp::carp $dbh->{ado_provider_auto_commit_comments}
 			unless $dbh->{ado_provider_support_auto_commit};
     if ( $dbh->FETCH('BegunWork') ) {
       $dbh->{AutoCommit} = 1;
@@ -311,6 +311,13 @@ my @sql_types_supported = ();
 		}
     return 1;
 	}
+
+  sub ping {
+    my ( $dbh ) = @_;
+    my $conn = $dbh->{ado_conn};
+
+    defined $conn && $conn->State & $ado_consts->{ObjectStateEnum}{adStateOpen};
+  }
 
 	sub disconnect {
 		my ($dbh) = @_;
@@ -356,7 +363,7 @@ my @sql_types_supported = ();
 
 		return warn "Commit ineffective when AutoCommit is on\n"
 			if $dbh->{AutoCommit} and $dbh->FETCH('Warn');
-		return carp $dbh->{ado_provider_auto_commit_comments}
+		return Carp::carp $dbh->{ado_provider_auto_commit_comments}
 			unless $dbh->{ado_provider_support_auto_commit};
     if ( $dbh->FETCH('BegunWork') ) {
       $dbh->{AutoCommit} = 1;
@@ -783,8 +790,8 @@ my @sql_types_supported = ();
 					# Jan Dubois jand@activestate.com addition to handle changes
 					# in Win32::OLE return of Variant types of data.
 					foreach ( @out ) {
-						$_ = $_->As(Win32::OLE::Variant::VT_BSTR())
-							if (defined $_) && (UNIVERSAL::isa($_, 'Win32::OLE::Variant'));
+						$_ = $_->As( Win32::OLE::Variant::VT_BSTR() )
+							if ( defined $_ ) && ( UNIVERSAL::isa( $_, 'Win32::OLE::Variant') );
 					}
 					if ($attribs->{Trim_Catalog}) {
 						$out[0] =~ s/^(.*\\)// if defined $out[0];  # removes leading
@@ -996,22 +1003,20 @@ my @sql_types_supported = ();
 		my @myti;
 		# my $sth = $dbh->func('adSchemaProviderTypes','OpenSchema');
 
-
-		# my $sth = $dbh->func( DBI::SQL_ALL_TYPES(), 'GetTypeInfo' );
 		# If the type information is previously obtained, use it.
-		unless( $dbh->{ado_types_supported} ) {
+		unless( $dbh->{ado_all_types_supported} ) {
 			&_determine_type_support or
-				croak "_determine_type_support failed: ", $dbh->{errstr};
+				Carp::croak "_determine_type_support failed: ", $dbh->{errstr};
 		}
 
 		my $ops = _open_schema($dbh, 'adSchemaProviderTypes' );
-		croak "ops undefined!" unless defined $ops;
+		Carp::croak "ops undefined!" unless defined $ops;
 
 		my $ado_info		= [ @{$ops->{NAME}} ];
 		$ops->finish; $ops = undef;
 
 		my $sponge = DBI->connect("dbi:Sponge:","","",{ PrintError => 1, RaiseError => 1 });
-		croak "sponge return undefined: $DBI::errstr" unless defined $sponge;
+		Carp::croak "sponge return undefined: $DBI::errstr" unless defined $sponge;
 
 		my $sth = $sponge->prepare("adSchemaProviderTypes", {
 			rows=>   [ @{$dbh->{ado_all_types_supported}} ] , NAME=> $ado_info,
@@ -1047,102 +1052,102 @@ my @sql_types_supported = ();
 		my $Enums = DBD::ADO::Const->Enums;
 		my $Dt = $Enums->{DataTypeEnum};
 
-		# Attempt to convert data types from ODBC to ADO.
-		my %local_types = (
-		DBI::SQL_BINARY()   => [
-		  $Dt->{adBinary}
-		, $Dt->{adVarBinary}
-		],
-		DBI::SQL_BIT()      => [$Dt->{adBoolean}],
-		DBI::SQL_CHAR()     => [
-		  $Dt->{adChar}
-		, $Dt->{adVarChar}
-		, $Dt->{adWChar}
-		, $Dt->{adVarWChar}
-		],
-		DBI::SQL_DATE()     => [
-		  $Dt->{adDBTimeStamp}
-		, $Dt->{adDate}
-		],
-		DBI::SQL_DECIMAL()  => [$Dt->{adNumeric}],
-		DBI::SQL_DOUBLE()   => [$Dt->{adDouble}],
-		DBI::SQL_FLOAT()    => [$Dt->{adSingle}],
-		DBI::SQL_INTEGER()  => [$Dt->{adInteger}],
-		DBI::SQL_LONGVARBINARY() => [
-		  $Dt->{adLongVarBinary}
-		, $Dt->{adVarBinary}
-		, $Dt->{adBinary}
-		],
-		DBI::SQL_LONGVARCHAR() => [
-		  $Dt->{adLongVarChar}
-		, $Dt->{adVarChar}
-		, $Dt->{adChar}
-		, $Dt->{adLongVarWChar}
-		, $Dt->{adVarWChar}
-		, $Dt->{adWChar}
-		],
-		DBI::SQL_NUMERIC()  => [$Dt->{adNumeric}],
-		DBI::SQL_REAL()     => [$Dt->{adSingle}],
-		DBI::SQL_SMALLINT() => [$Dt->{adSmallInt}],
-		DBI::SQL_TIMESTAMP() => [
-		  $Dt->{adDBTime}
-		, $Dt->{adDBTimeStamp}
-		, $Dt->{adDate}
-		],
-		DBI::SQL_TINYINT()  => [$Dt->{adUnsignedTinyInt}],
-		DBI::SQL_VARBINARY() => [
-		  $Dt->{adVarBinary}
-		, $Dt->{adLongVarBinary}
-		, $Dt->{adBinary}
-		],
-		DBI::SQL_VARCHAR()  => [
-		  $Dt->{adVarChar}
-		, $Dt->{adChar}
-		, $Dt->{adVarWChar}
-		, $Dt->{adWChar}
-		],
-		DBI::SQL_WCHAR()  => [
-		  $Dt->{adWChar}
-		, $Dt->{adVarWChar}
-		, $Dt->{adLongVarWChar}
-		],
-		DBI::SQL_WVARCHAR()  => [
-		  $Dt->{adVarWChar}
-		, $Dt->{adLongVarWChar}
-		, $Dt->{adWChar}
-		],
-		DBI::SQL_WLONGVARCHAR()  => [
-		  $Dt->{adLongVarWChar}
-		, $Dt->{adVarWChar}
-		, $Dt->{adWChar}
-		, $Dt->{adLongVarChar}
-		, $Dt->{adVarChar}
-		, $Dt->{adChar}
-		],
-		);
+    # Attempt to convert data types from ODBC to ADO.
+    my %local_types = (
+      DBI::SQL_BINARY()        => [
+        $Dt->{adBinary}
+      , $Dt->{adVarBinary}
+      ]
+    , DBI::SQL_BIT()           => [ $Dt->{adBoolean}]
+    , DBI::SQL_CHAR()          => [
+        $Dt->{adChar}
+      , $Dt->{adVarChar}
+      , $Dt->{adWChar}
+      , $Dt->{adVarWChar}
+      ]
+    , DBI::SQL_DATE()          => [
+        $Dt->{adDBTimeStamp}
+      , $Dt->{adDate}
+      ]
+    , DBI::SQL_DECIMAL()       => [ $Dt->{adNumeric} ]
+    , DBI::SQL_DOUBLE()        => [ $Dt->{adDouble} ]
+    , DBI::SQL_FLOAT()         => [ $Dt->{adSingle} ]
+    , DBI::SQL_INTEGER()       => [ $Dt->{adInteger} ]
+    , DBI::SQL_LONGVARBINARY() => [
+        $Dt->{adLongVarBinary}
+      , $Dt->{adVarBinary}
+      , $Dt->{adBinary}
+      ]
+    , DBI::SQL_LONGVARCHAR()   => [
+        $Dt->{adLongVarChar}
+      , $Dt->{adVarChar}
+      , $Dt->{adChar}
+      , $Dt->{adLongVarWChar}
+      , $Dt->{adVarWChar}
+      , $Dt->{adWChar}
+      ]
+    , DBI::SQL_NUMERIC()       => [ $Dt->{adNumeric} ]
+    , DBI::SQL_REAL()          => [ $Dt->{adSingle} ]
+    , DBI::SQL_SMALLINT()      => [ $Dt->{adSmallInt} ]
+    , DBI::SQL_TIMESTAMP()     => [
+        $Dt->{adDBTime}
+      , $Dt->{adDBTimeStamp}
+      , $Dt->{adDate}
+      ]
+    , DBI::SQL_TINYINT()       => [ $Dt->{adUnsignedTinyInt} ]
+    , DBI::SQL_VARBINARY()     => [
+        $Dt->{adVarBinary}
+      , $Dt->{adLongVarBinary}
+      , $Dt->{adBinary}
+      ]
+    , DBI::SQL_VARCHAR()       => [
+        $Dt->{adVarChar}
+      , $Dt->{adChar}
+      , $Dt->{adVarWChar}
+      , $Dt->{adWChar}
+      ]
+    , DBI::SQL_WCHAR()         => [
+        $Dt->{adWChar}
+      , $Dt->{adVarWChar}
+      , $Dt->{adLongVarWChar}
+      ]
+    , DBI::SQL_WVARCHAR()      => [
+        $Dt->{adVarWChar}
+      , $Dt->{adLongVarWChar}
+      , $Dt->{adWChar}
+      ]
+    , DBI::SQL_WLONGVARCHAR()  => [
+        $Dt->{adLongVarWChar}
+      , $Dt->{adVarWChar}
+      , $Dt->{adWChar}
+      , $Dt->{adLongVarChar}
+      , $Dt->{adVarChar}
+      , $Dt->{adChar}
+      ]
+    );
 
-		my @sql_types = (
-			DBI::SQL_BINARY(),
-			DBI::SQL_BIT(),
-			DBI::SQL_CHAR(),
-			DBI::SQL_DATE(),
-			DBI::SQL_DECIMAL(),
-			DBI::SQL_DOUBLE(),
-			DBI::SQL_FLOAT(),
-			DBI::SQL_INTEGER(),
-			DBI::SQL_LONGVARBINARY(),
-			DBI::SQL_LONGVARCHAR(),
-			DBI::SQL_NUMERIC(),
-			DBI::SQL_REAL(),
-			DBI::SQL_SMALLINT(),
-			DBI::SQL_TIMESTAMP(),
-			DBI::SQL_TINYINT(),
-			DBI::SQL_VARBINARY(),
-			DBI::SQL_VARCHAR(),
-			DBI::SQL_WCHAR(),
-			DBI::SQL_WVARCHAR(),
-			DBI::SQL_WLONGVARCHAR(),
-		);
+    my @sql_types = (
+      DBI::SQL_BINARY()
+    , DBI::SQL_BIT()
+    , DBI::SQL_CHAR()
+    , DBI::SQL_DATE()
+    , DBI::SQL_DECIMAL()
+    , DBI::SQL_DOUBLE()
+    , DBI::SQL_FLOAT()
+    , DBI::SQL_INTEGER()
+    , DBI::SQL_LONGVARBINARY()
+    , DBI::SQL_LONGVARCHAR()
+    , DBI::SQL_NUMERIC()
+    , DBI::SQL_REAL()
+    , DBI::SQL_SMALLINT()
+    , DBI::SQL_TIMESTAMP()
+    , DBI::SQL_TINYINT()
+    , DBI::SQL_VARBINARY()
+    , DBI::SQL_VARCHAR()
+    , DBI::SQL_WCHAR()
+    , DBI::SQL_WVARCHAR()
+    , DBI::SQL_WLONGVARCHAR()
+    );
 
 		# Get the Provider Types attributes.
 		my @sort_rows;
@@ -1169,11 +1174,10 @@ my @sql_types_supported = ();
 			, $rs->{TYPE_NAME}->Value
 			));
 			$dbh->trace_msg("    -- data type $type_name: $def\n");
-			my @out = map { $rs->{$_}->Value || '' } @$ado_info;
-			$ct{$type_name} = \@out;
+			@{$ct{$type_name}} = map { $rs->{$_}->Value || '' } @$ado_info;
 			$rs->MoveNext;
 		}
-		$rs->Close if $rs and
+		$rs->Close if $rs &&
 			$rs->State & $ado_consts->{ObjectStateEnum}{adStateOpen};
 		$rs = undef;
 		for my $t ( @sql_types ) {
@@ -1192,17 +1196,12 @@ my @sql_types_supported = ();
 			elsif ( $t == DBI::SQL_WCHAR()         ) { $re = qr{^($alt)\s\d\s0\s1\s}  }
 			else                                     { $re = qr{^($alt)\s\d\s\d\s}    }
 
-			my @tm = sort { $b cmp $a } grep { /$re/ } @sort_rows;
-			next unless @tm;
-			for ( @tm ) {
+			for ( sort { $b cmp $a } grep { /$re/ } @sort_rows ) {
 				my ($cc) = m/\d+\s+(\D\w?.*)$/;
 				Carp::carp "$cc does not exist in hash\n" unless exists $ct{$cc};
 				my @rec = @{$ct{$cc}};
-				my @mrec = @rec;
-				push @sql_types_supported, $t, \@mrec;
 				$dbh->trace_msg("Changing type $rec[1] -> $t : @rec\n");
 				$rec[1] = $t;
-				push @{$dbh->{ado_types_supported}->{$mrec[1]}}, \@rec;
 				push @{$dbh->{ado_all_types_supported}}, \@rec;
 			}
 		}
@@ -1360,7 +1359,7 @@ my @sql_types_supported = ();
 	sub DESTROY {  # Database handle
 		my ($dbh) = @_;
 
-		croak "Database handle called with undefined dbh ... very odd!"
+		Carp::croak "Database handle called with undefined dbh ... very odd!"
 			unless defined $dbh;
 
 		$dbh->trace_msg( "-> Database Handle Destroy:" , 2 );
@@ -1371,7 +1370,7 @@ my @sql_types_supported = ();
 			defined $conn ? 'No' : 'Yes' , 2 );
 
 		if ( defined $conn ) {
-			carp "Connection open, destroy";
+			Carp::carp "Connection open, destroy";
 			local ($Win32::OLE::Warn);
 			$Win32::OLE::Warn = 0;
 			# Determine if a connection is made, close an open connection.
@@ -1417,27 +1416,20 @@ my @sql_types_supported = ();
 
 { package DBD::ADO::st; # ====== STATEMENT ======
 
-	use Win32::OLE::Variant;
-	use Win32::OLE::NLS qw(:DATE);
-	use strict;
-	use vars qw($VT_VAR $VT_DAT $VT_STR $VT_BIN);
-	use constant NOT_SUPPORTED => '-2147217839';
-	use constant EXCEPTION_OCC => '-2147352567';
-	use Data::Dumper;
-	use Carp;
+  use strict;
+  use Win32::OLE();
+  use Win32::OLE::Variant();
   use DBD::ADO::TypeInfo();
   use DBD::ADO::Const();
 
   $DBD::ADO::st::imp_data_size = 0;
 
+	use constant NOT_SUPPORTED => '-2147217839';
+	use constant EXCEPTION_OCC => '-2147352567';
+
   my $ado_consts = DBD::ADO::Const->Enums;
 
-	$VT_VAR = VT_VARIANT() | VT_BYREF();
-	$VT_DAT = VT_DATE();
-	$VT_STR = VT_BSTR() | VT_BYREF();
-	$VT_BIN = VT_UI1()  | VT_ARRAY();
-
-	my $VT_I4_BYREF = VT_I4() | VT_BYREF();
+  my $VT_I4_BYREF = Win32::OLE::Variant::VT_I4() | Win32::OLE::Variant::VT_BYREF();
 
 	sub blob_read {
 		my ($sth, $cnum, $offset, $lng, $attr) = @_;
@@ -1524,7 +1516,7 @@ my @sql_types_supported = ();
            $i->{Type} == $ado_consts->{DataTypeEnum}{adLongVarBinary}
       ) {
         # Deal with an image request.
-        my $pic = Variant( VT_UI1|VT_ARRAY, 10 + length $val );  # $i->{Size}
+        my $pic = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_UI1() | Win32::OLE::Variant::VT_ARRAY(), 10 + length $val );  # $i->{Size}
         $pic->Put( $val );
         $i->{Value} = $pic;
         $sth->trace_msg("    -- Binary: $i->{Type} $i->{Size}\n");
@@ -1534,7 +1526,7 @@ my @sql_types_supported = ();
         $sth->trace_msg("    -- Type  : $i->{Type} $i->{Size}\n");
       }
     } else {
-      $i->{Value} = Variant( VT_NULL );
+      $i->{Value} = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_NULL() );
     }
     return 1;
   }
@@ -1611,7 +1603,7 @@ my @sql_types_supported = ();
 		# type of cursors, I need to create a recordset object.
 
 		# Return the affected number to rows.
-		my $rows = Variant->new( $VT_I4_BYREF, 0 );
+		my $rows = Win32::OLE::Variant->new( $VT_I4_BYREF, 0 );
 
 		# However, a RecordSet Open does not return affected rows.  So I need to
 		# determine if a recordset open is needed, or a command execute.
@@ -1792,7 +1784,7 @@ my @sql_types_supported = ();
 		# Jan Dubois jand@activestate.com addition to handle changes
 		# in Win32::OLE return of Variant types of data.
 		foreach (@$row) {
-			$_ = $_->As(VT_BSTR)
+			$_ = $_->As( Win32::OLE::Variant::VT_BSTR() )
 				if UNIVERSAL::isa($_, 'Win32::OLE::Variant');
 		}
 		if ($sth->FETCH('ChopBlanks')) {
@@ -1876,12 +1868,11 @@ my @sql_types_supported = ();
 
    sub DESTROY { # Statement handle
     my ($sth) = @_;
-		# carp "Destroy statement handle";
+		$sth->trace_msg("<- destroy statement handler\n", 1 );
 
+    # XXX: Necessary? Call finish()? Or is it called already?
     my $rs = $sth->{ado_rowset};
-		# carp "Statement handle has active recordset" if defined $rs;
-
-		$sth->trace_msg( "<- destroy statement handler\n", 1 );
+#   Carp::carp "Statement handle has active recordset" if defined $rs;
 		$rs->Close ()
 			if (defined $rs
 				and UNIVERSAL::isa($rs, 'Win32::OLE')
@@ -1890,7 +1881,7 @@ my @sql_types_supported = ();
 		$sth->{ado_rowset} = undef;
 		$sth->STORE(ado_rowset => undef);
     $sth->STORE(Active => 0);
-		$sth->trace_msg( "-> destroy statement handler\n", 1 );
+		$sth->trace_msg("-> destroy statement handler\n", 1 );
 
 		$sth = undef;
 		return;
@@ -1954,22 +1945,29 @@ data sources.
 
 =head1 Functions support
 
-	Using the standard DBI function call
-		$dbh->func( arguments, 'function name')
+The DBI func() method can be used to call private methods implemented by the
+driver:
 
-	You may access the following functions: (case sensitive)
-		OpenSchema
+  $h->func( @func_arguments, $func_name ) or die ...;
 
-	All functions return a valid statement handle upon success.
+You may access the following database handle methods:
 
-		OpenSchema supports the following arguments:
-			Any valid ADO Schema name such as
-			adSchemaCatalogs
-			adSchemaIndexes
-			adSchemaProviderTypes
+  OpenSchema
 
-			example:
-			my $sth = $dbh->func( 'adSchemaProviderTypes', 'OpenSchema' );
+All functions return a valid statement handle upon success.
+
+OpenSchema supports as arguments any valid ADO SchemaEnum name such as
+
+  adSchemaTables
+  adSchemaIndexes
+  adSchemaProviderTypes
+
+Example:
+
+  my $sth = $dbh->func('adSchemaCheckConstraints','Catalog1','OpenSchema');
+
+See ex/OpenSchema.pl for a working example.
+
 
 =head1 DBI Methods
 

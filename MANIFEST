@@ -15,6 +15,7 @@ t/01base.t
 t/02cxn.t
 t/02simple.t
 t/03dbatt.t
+t/04os.t
 t/05gi.t
 t/05meth.t
 t/07long.t

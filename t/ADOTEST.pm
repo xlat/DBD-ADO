@@ -22,7 +22,7 @@ use DBI qw(:sql_types);
 
 use vars qw($VERSION $table_name %TestFieldInfo %LTestFieldInfo);
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 $table_name = 'PERL_DBD_TEST';
 
 %TestFieldInfo = (
@@ -45,7 +45,7 @@ sub get_type_for_column {
   for my $type ( @{$TestFieldInfo{$col}} ) {
     @row = $dbh->type_info( $type );
     # may not correct behavior, but get the first compat type
-    #print "Type $type rows: ", scalar(@row), "\n";
+    #print "# Type $type rows: ", scalar(@row), "\n";
     last if @row;
   }
   die "Unable to find a suitable test type for field $col" unless @row;
@@ -63,10 +63,10 @@ sub tab_create {
   # trying to use ADO to tell us what type of data to use, instead of the above.
   my $fields = undef;
   for my $f ( sort keys %TestFieldInfo ) {
-    #print "$f: @{$TestFieldInfo{$f}}\n";
+    #print "# $f: @{$TestFieldInfo{$f}}\n";
     $fields .= ', ' unless !$fields;
     $fields .= "$f ";
-    print "-- $fields\n";
+    print "# -- $fields\n";
 
     my @row = get_type_for_column( $dbh, $f );
     shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/i;
@@ -84,9 +84,9 @@ sub tab_create {
       $fields .= '(' . $r->{COLUMN_SIZE} . ', 0)'
         if $r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
     }
-    print "-- $fields\n";
+    print "# -- $fields\n";
   }
-  print "Using fields: $fields\n";
+  print "# Using fields: $fields\n";
   return $dbh->do("CREATE TABLE $tbl( $fields )");
 }
 
@@ -101,7 +101,7 @@ sub tab_exists {
   my $sth = $dbh->table_info;
 
   unless ( $sth ) {
-    print "Can't list tables: $DBI::errstr\n";
+    print "# Can't list tables: $DBI::errstr\n";
     return -1;
   }
   # TABLE_QUALIFIER,TABLE_OWNER,TABLE_NAME,TABLE_TYPE,REMARKS
@@ -116,7 +116,7 @@ sub tab_exists {
       # and (uc($user) eq uc($row[1])))
       # qeDBF driver returns null for TABLE_OWNER
       my $owner = $row->{TABLE_OWNER} || '(unknown owner)';
-      print "$owner.$row->{TABLE_NAME}\n";
+      print "# $owner.$row->{TABLE_NAME}\n";
       $rc = 1;
       last;
     }
@@ -169,7 +169,7 @@ sub tab_long_create {
   for my $f ( sort keys %LTestFieldInfo ) {
     $fields .= ', ' unless !$fields;
     $fields .= "$f ";
-    print "-- $fields\n";
+    print "# -- $fields\n";
     @row = get_long_type_for_column($dbh, $f);
     shift @row if ($row[0])->{TYPE_NAME} =~ /identity$/;
 
@@ -181,9 +181,9 @@ sub tab_long_create {
       $fields .= '(' . $r->{COLUMN_SIZE} . ', 0)'
         if $r->{CREATE_PARAMS} =~ /PRECISION,SCALE/i;
     }
-    print "-- $fields\n";
+    print "# -- $fields\n";
   }
-  print "Using fields: $fields\n";
+  print "# Using fields: $fields\n";
   return $dbh->do("CREATE TABLE $table_name( $fields )");
 }
 
@@ -195,7 +195,7 @@ sub get_long_type_for_column {
   for my $type ( @{$LTestFieldInfo{$col}} ) {
     @row = $dbh->type_info( $type );
     # may not correct behavior, but get the first compat type
-    #print "Type $type rows: ", scalar(@row), "\n";
+    #print "# Type $type rows: ", scalar(@row), "\n";
     last if @row;
   }
   die "Unable to find a suitable test type for field $col" unless @row;

@@ -1,3 +1,17 @@
+2003-11-30  2.81
+
+  Fixed Makefile.PL to work with strict 1.03 (perl 5.8.1.),
+  reported by Eric Thinnes.
+
+  Added ping().
+  Added tests for ping() to t/02cxn.t.
+  Removed ping() tests from t/15func.t.
+
+  Fixed connect() to set 'Active' on.
+  Added a test for the 'Active' flag to t/02cxn.t
+
+  Moved OpenSchema() tests from t/11curs.t into t/04os.t.
+
 2003-11-23  2.80
 
   Fixed a bug affecting OpenSchema (first row was fetched twice).

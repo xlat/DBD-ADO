@@ -48,39 +48,46 @@ Connection
             WARNING: The application is responsible for passing the correct
             information when setting any of these attributes.
 
+
 Functions support
 
-            Using the standard DBI function call
-                    $dbh->func( arguments, 'function name')
+  The DBI func() method can be used to call private methods implemented by the
+  driver:
 
-            You may access the following functions: (case sensitive)
-                    OpenSchema
+    $h->func( @func_arguments, $func_name ) or die ...;
 
-            All functions return a valid statement handle upon success.
+  You may access the following database handle methods:
 
-                    OpenSchema supports the following arguments:
-                            Any valid ADO Schema name such as
-                            adSchemaCatalogs
-                            adSchemaIndexes
-                            adSchemaProviderTypes
+    OpenSchema
 
-                            example:
-                            my $sth = $dbh->func( 'adSchemaProviderTypes', 'OpenSchema' );
+  All functions return a valid statement handle upon success.
+
+  OpenSchema supports as arguments any valid ADO SchemaEnum name such as
+
+    adSchemaTables
+    adSchemaIndexes
+    adSchemaProviderTypes
+
+  Example:
+
+    my $sth = $dbh->func('adSchemaCheckConstraints','Catalog1','OpenSchema');
+
+  See ex/OpenSchema.pl for a working example.
 
 
 DBI Methods
 
-data_sources
+  data_sources
 
-Because ADO doesn't provide a data source repository, DBD::ADO uses it's
-own. It tries to load Local::DBD::ADO::DSN and expects an array of hashes
-describing the data sources. See ex/Local/DBD/ADO/DSN.pm for an example.
+    Because ADO doesn't provide a data source repository, DBD::ADO uses it's
+    own. It tries to load Local::DBD::ADO::DSN and expects an array of hashes
+    describing the data sources. See ex/Local/DBD/ADO/DSN.pm for an example.
 
-Warning: This is experimental and may change.
+    Warning: This is experimental and may change.
 
-Warning: Check for the unlikly case that a file Local/DBD/ADO/DSN.pm
-exists in your module search path which causes unwanted side effects when
-loaded.
+    Warning: Check for the unlikly case that a file Local/DBD/ADO/DSN.pm
+    exists in your module search path which causes unwanted side effects when
+    loaded.
 
 
 Enhanced DBI Methods
