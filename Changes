@@ -1,3 +1,9 @@
+2004-05-02  2.91
+
+  Adjusted the trace levels in trace_msg().
+
+  Removed disconnect_all().
+
 2004-03-21  2.90
 
   Changed default for $dbh->{ado_ti_ver} to 2.

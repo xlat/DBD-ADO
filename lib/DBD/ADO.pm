@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state $errcum);
 
-  $VERSION = '2.90';
+  $VERSION = '2.91';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    =  0;     # The $DBI::err value
@@ -38,7 +38,7 @@
     my $lastError = Win32::OLE->LastError;
     if ( $lastError ) {
       $DBD::ADO::errcum = $DBD::ADO::err = 0+$lastError;
-      push @Err, "\n  Last error : $DBD::ADO::err\n\n$lastError";
+      push @Err,"\n  Last error : $DBD::ADO::err\n\n$lastError";
     } else {
       $DBD::ADO::err    =  0;
       $DBD::ADO::errstr = '';
@@ -51,7 +51,7 @@
         my $Count = $Errors->Count;
         for ( my $i = 1; $i <= $Count; $i++ ) {
           if ( $i > $MaxErrors ) {
-            push @Err, "\n    ... (too many errors: $Count)";
+            push @Err,"\n    ... (too many errors: $Count)";
             $i = $Count;
           }
           my $err = $Errors->Item( $i - 1 );
@@ -136,8 +136,7 @@
 		$conn->{CommandTimeout} = \$this->{ado_commandtimeout};
 
 		$this->{ado_conn} = $conn;
-		$drh->trace_msg('    -- ADO Connection: ' . ref $this->{ado_conn} .
-			' Connection: ' . ref $conn . "\n", 5 );
+		$drh->trace_msg('    -- Connection: ' . ref( $conn ) . "\n", 5 );
 		##  ODBC rule - Null is not the same as an empty password...
 		$auth = '' if !defined $auth;
 
@@ -150,7 +149,6 @@
 					# Only include the options defined.
 					if( $conn->{$c} ) {
 						$this->STORE( $c, $v );
-						$drh->trace_msg("->> Storing $c $v\n", 1);
 						next;
 					}
 				}
@@ -166,7 +164,7 @@
 		}
 
 		$cdsn = join ';', @cdsn;
-		$drh->trace_msg("->> Open ADO connection using $cdsn\n", 1);
+		$drh->trace_msg("    -- Open ADO connection using $cdsn\n", 5 );
 		$conn->Open( $cdsn, $user, $auth );
 		return if DBD::ADO::Failed( $drh,"Can't connect to '$dsn'");
 
@@ -177,7 +175,7 @@
 		if ( $@ ) {
 			$this->{ado_txn_capable} = 0;
 			my $lastError = DBD::ADO::errors($conn);
-			$drh->trace_msg("    -- Can't determine transaction support: $lastError\n", 5 );
+			$drh->trace_msg("    !! Can't determine transaction support: $lastError\n", 5 );
 		}
 		$drh->trace_msg("    -- Transaction support: $this->{ado_txn_capable}\n", 5 );
 
@@ -185,32 +183,7 @@
 		return $outer;
 	}
 
-
-  sub disconnect_all { }
-
 } # ====== DRIVER ======
-
-my $ado_schematables = [
-  qw( TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS
-    TABLE_GUID TABLE_PROPID DATE_CREATED DATE_MODIFIED
-) ];
-
-my $ado_dbi_schematables = [
-  qw( TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS )
-];
-
-my $sch_dbi_to_ado = {
-  TABLE_CAT     => 'TABLE_CATALOG'
-, TABLE_SCHEM   => 'TABLE_SCHEMA'
-, TABLE_NAME    => 'TABLE_NAME'
-, TABLE_TYPE    => 'TABLE_TYPE'
-, REMARKS       => 'DESCRIPTION'
-, TABLE_GUID    => 'TABLE_GUID'
-, TABLE_PROPID  => 'TABLE_PROPID'
-, DATE_CREATED  => 'DATE_CREATED'
-, DATE_MODIFIED => 'DATE_MODIFIED'
-};
-
 
 { package DBD::ADO::db; # ====== DATABASE ======
 
@@ -226,6 +199,25 @@ my $sch_dbi_to_ado = {
 
   my $ado_consts = DBD::ADO::Const->Enums;
 
+  my $ado_schematables = [
+    qw( TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS
+      TABLE_GUID TABLE_PROPID DATE_CREATED DATE_MODIFIED
+  ) ];
+  my $ado_dbi_schematables = [
+    qw( TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS )
+  ];
+  my $sch_dbi_to_ado = {
+    TABLE_CAT     => 'TABLE_CATALOG'
+  , TABLE_SCHEM   => 'TABLE_SCHEMA'
+  , TABLE_NAME    => 'TABLE_NAME'
+  , TABLE_TYPE    => 'TABLE_TYPE'
+  , REMARKS       => 'DESCRIPTION'
+  , TABLE_GUID    => 'TABLE_GUID'
+  , TABLE_PROPID  => 'TABLE_PROPID'
+  , DATE_CREATED  => 'DATE_CREATED'
+  , DATE_MODIFIED => 'DATE_MODIFIED'
+  };
+
 
   sub ping {
     my ($dbh) = @_;
@@ -240,17 +232,17 @@ my $sch_dbi_to_ado = {
     my $conn = $dbh->{ado_conn};
     if ( defined $conn ) {
       local $Win32::OLE::Warn = 0;
-      $dbh->trace_msg('    -- State: ' . $conn->State . "\n");
+      $dbh->trace_msg('    -- State: ' . $conn->State . "\n", 5 );
       if ( $conn->State & $ado_consts->{ObjectStateEnum}{adStateOpen} ) {
         # Change the connection attribute so Commit/Rollback
         # does not start another transaction.
         $conn->{Attributes} = 0;
         my $lastError = DBD::ADO::errors($conn);
         return $dbh->set_err( $DBD::ADO::err || -1,"Failed setting CommitRetaining: $lastError") if $lastError && $lastError !~ m/-2147168242/;
-        $dbh->trace_msg('    -- Modified ADO Connection Attributes: ' . $conn->{Attributes} . "\n");
+        $dbh->trace_msg('    -- Modified ADO Connection Attributes: ' . $conn->{Attributes} . "\n", 5 );
 
         my $auto = $dbh->{AutoCommit};
-        $dbh->trace_msg("    -- AutoCommit: $auto, Provider Support: $dbh->{ado_txn_capable}\n");
+        $dbh->trace_msg("    -- AutoCommit: $auto, Provider Support: $dbh->{ado_txn_capable}\n", 5 );
         $conn->RollbackTrans unless $auto and
           not $dbh->{ado_txn_capable};
         $lastError = DBD::ADO::errors($conn);
@@ -397,7 +389,7 @@ my $sch_dbi_to_ado = {
 
 		# Set overrides for and attributes.
 		for my $key ( grep { /^ado_/ } keys %$attribs ) {
-			$sth->trace_msg("    -- Attribute: $key => $attribs->{$key}\n");
+			$sth->trace_msg("    -- Attribute: $key => $attribs->{$key}\n", 5 );
 			if ( exists $sth->{$key} ) {
 				$sth->{$key} = $attribs->{$key};
 			} else {
@@ -420,7 +412,7 @@ my $sch_dbi_to_ado = {
       };
       my $lastError = DBD::ADO::errors( $conn );
       if ( $lastError ) {
-        $dbh->trace_msg("    !! Refresh error: $lastError\n", 4 );
+        $dbh->trace_msg("    !! Refresh error: $lastError\n", 5 );
         $sth->{ado_refresh} = 2;
       }
     }
@@ -431,7 +423,7 @@ my $sch_dbi_to_ado = {
       # Describe the Parameters:
       for my $p ( Win32::OLE::in( $comm->Parameters ) ) {
         my @p = map "$_ => $p->{$_}", qw(Name Type Direction Size);
-        $dbh->trace_msg("    -- Parameter: @p\n", 4 );
+        $dbh->trace_msg("    -- Parameter: @p\n", 5 );
       }
       $outer->STORE('NUM_OF_PARAMS', $Cnt );
     }
@@ -446,41 +438,41 @@ my $sch_dbi_to_ado = {
 	sub _rs_sth_prepare {
 		my($dbh, $rs, $attribs) = @_;
 
-		$dbh->trace_msg( "-> _rs_sth_prepare: Create statement handle from RecordSet\n" );
+		$dbh->trace_msg("    -> _rs_sth_prepare: Create statement handle from RecordSet\n", 3 );
 
 		my $conn = $dbh->{ado_conn};
 		my $ado_fields = [ Win32::OLE::in( $rs->Fields ) ];
 
 		my ($outer, $sth) = DBI::_new_sth($dbh, {
-		  NAME				=> [ map { $_->Name } @$ado_fields ]
-		, TYPE				=> [ map { $_->Type } @$ado_fields ]
-		, PRECISION		=> [ map { $_->Precision } @$ado_fields ]
-		, SCALE				=> [ map { $_->NumericScale } @$ado_fields ]
-		, NULLABLE		=> [ map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayBeNull}? 1 : 0 } @$ado_fields ]
-		, Statement		=> $rs->Source
-		, LongReadLen	=> 0
-		, LongTruncOk	=> 0
-		, CursorName	=> undef
-		, ParamValues	=> {}
-		, RowsInCache	=> 0
+		  NAME           => [ map { $_->Name } @$ado_fields ]
+		, TYPE           => [ map { $_->Type } @$ado_fields ]
+		, PRECISION      => [ map { $_->Precision } @$ado_fields ]
+		, SCALE          => [ map { $_->NumericScale } @$ado_fields ]
+		, NULLABLE       => [ map { $_->Attributes & $ado_consts->{FieldAttributeEnum}{adFldMayBeNull}? 1 : 0 } @$ado_fields ]
+		, Statement      => $rs->Source
+		, LongReadLen    => 0
+		, LongTruncOk    => 0
+		, CursorName     => undef
+		, ParamValues    => {}
+		, RowsInCache    => 0
 		, ado_max_errors => $dbh->{ado_max_errors}
-		, ado_type		=> [ map { $_->Type } @$ado_fields ]
+		, ado_type       => [ map { $_->Type } @$ado_fields ]
 		});
 
-		$sth->{ado_comm}		= $conn;
-		$sth->{ado_conn}		= $conn;
-		$sth->{ado_dbh}			= $dbh;
-		$sth->{ado_fields}	= $ado_fields;
-		$sth->{ado_refresh}	= 0;
-		$sth->{ado_rownum}	= 0;
-		$sth->{ado_rows}		= -1;
-		$sth->{ado_rowset}	= $rs;
-		$sth->{ado_attribs}	= $attribs;
+		$sth->{ado_comm}    = $conn;
+		$sth->{ado_conn}    = $conn;
+		$sth->{ado_dbh}     = $dbh;
+		$sth->{ado_fields}  = $ado_fields;
+		$sth->{ado_refresh} = 0;
+		$sth->{ado_rownum}  = 0;
+		$sth->{ado_rows}    = -1;
+		$sth->{ado_rowset}  = $rs;
+		$sth->{ado_attribs} = $attribs;
 
 		$sth->STORE('NUM_OF_FIELDS', scalar @$ado_fields );
 		$sth->STORE('Active', 1 );
 
-		$dbh->trace_msg( "<- _rs_sth_prepare: Create statement handle from RecordSet\n" );
+		$dbh->trace_msg("    <- _rs_sth_prepare: Create statement handle from RecordSet\n", 3 );
 		return $outer;
 	}
 
@@ -508,7 +500,7 @@ my $sch_dbi_to_ado = {
 		my($dbh, $literal_name) = @_;
 		my $cache = $dbh->{ado_schema_dbinfo_literal_cache};
 		unless ( defined $cache ) {
-			$dbh->trace_msg("-> ado_schema_dbinfo_literal: filling cache\n");
+			$dbh->trace_msg("    -- ado_schema_dbinfo_literal: filling cache\n", 5 );
 			$cache = $dbh->{ado_schema_dbinfo_literal_cache} = {};
 			my $sth = $dbh->func('adSchemaDBInfoLiterals','OpenSchema');
 			while ( my $row = $sth->fetch ) {
@@ -524,10 +516,10 @@ my $sch_dbi_to_ado = {
 	sub table_info {
 		my($dbh, $attribs) = @_;
 		$attribs = {
-			TABLE_CAT   => $_[1],
-			TABLE_SCHEM => $_[2],
-			TABLE_NAME  => $_[3],
-			TABLE_TYPE  => $_[4],
+		  TABLE_CAT   => $_[1]
+		, TABLE_SCHEM => $_[2]
+		, TABLE_NAME  => $_[3]
+		, TABLE_TYPE  => $_[4]
 		} unless ref $attribs eq 'HASH';
 		my @Rows;
 		my $conn = $dbh->{ado_conn};
@@ -555,11 +547,11 @@ my $sch_dbi_to_ado = {
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die "Died on:\n$lastError" if $lastError;
 			};
-			$dbh->trace_msg( "->	Eval of adSchemaCatalogs died for $@\n" )
+			$dbh->trace_msg("    !! Eval of adSchemaCatalogs died for $@\n", 5 )
 				if $@;
-			$dbh->trace_msg( "->	Rule 19a\n" );
+			$dbh->trace_msg("    -- Rule 19a\n", 5 );
 			if ( $rs ) {
-				$dbh->trace_msg( "->	Rule 19a, record set defined\n" );
+				$dbh->trace_msg("    -- Rule 19a, record set defined\n", 5 );
 				while ( !$rs->{EOF} ) {
 					push @Rows, [ $rs->Fields(0)->{Value}, undef, undef, undef, undef ];
 					$rs->MoveNext;
@@ -568,7 +560,7 @@ my $sch_dbi_to_ado = {
 			else {
 				# The provider does not support the adSchemaCatalogs.  Let's attempt
 				# to still return a list of catalogs.
-				$dbh->trace_msg( "->	Rule 19a, record set undefined\n" );
+				$dbh->trace_msg("    -- Rule 19a, record set undefined\n", 5 );
 				my $csth = $dbh->table_info( { Trim_Catalog => 1 } );
 				if ( $csth ) {
           my $ref = {};
@@ -598,11 +590,11 @@ my $sch_dbi_to_ado = {
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die "Died on:\n$lastError" if $lastError;
 			};
-			$dbh->trace_msg( "->	Eval of adSchemaSchemata died for $@\n" )
+			$dbh->trace_msg("    !! Eval of adSchemaSchemata died for $@\n", 5 )
 				if $@;
-			$dbh->trace_msg( "->	Rule 19b\n" );
+			$dbh->trace_msg("    -- Rule 19b\n", 5 );
 			if ( $rs ) {
-				$dbh->trace_msg( "->	Rule 19b, record set defined\n" );
+				$dbh->trace_msg("    -- Rule 19b, record set defined\n", 5 );
 				while ( !$rs->{EOF} ) {
 					push @Rows, [ $rs->Fields(0)->{Value}, $rs->Fields(1)->{Value}, undef, undef, undef ];
 					$rs->MoveNext;
@@ -611,7 +603,7 @@ my $sch_dbi_to_ado = {
 			else {
 				# The provider does not support the adSchemaSchemata.  Let's attempt
 				# to still return a list of schemas.
-				$dbh->trace_msg( "->	Rule 19b, record set undefined\n" );
+				$dbh->trace_msg("    -- Rule 19b, record set undefined\n", 5 );
 				my $csth = $dbh->table_info( { Trim_Catalog => 1 } );
 				if ( $csth ) {
           my $ref = {};
@@ -636,7 +628,7 @@ my $sch_dbi_to_ado = {
 				 && (defined $attribs->{TABLE_NAME}  && $attribs->{TABLE_NAME}  eq '' )
 				 && (defined $attribs->{TABLE_TYPE}  && $attribs->{TABLE_TYPE}  eq '%')
 				 ) { # Rule 19c
-			$dbh->trace_msg( "->	Rule 19c\n" );
+			$dbh->trace_msg("    -- Rule 19c\n", 5 );
 			my @TableTypes = ('ALIAS','TABLE','SYNONYM','SYSTEM TABLE','VIEW','GLOBAL TEMPORARY','LOCAL TEMPORARY','SYSTEM VIEW'); # XXX
 			for ( sort @TableTypes ) {
 				push @Rows, [ undef, undef, undef, $_, undef ];
@@ -644,7 +636,7 @@ my $sch_dbi_to_ado = {
 		}
 		else {
 			@criteria = (undef); # ADO needs at least one element in the criteria array!
-			for (my $i=0; $i<@$ado_dbi_schematables; $i++) {
+			for ( my $i = 0; $i < @$ado_dbi_schematables; $i++ ) {
 				my $field = $ado_dbi_schematables->[$i];
 				if ( exists $attribs->{$field} ) {
 					$criteria[$i] = $attribs->{$field};
@@ -658,7 +650,7 @@ my $sch_dbi_to_ado = {
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die "Died on:\n$lastError" if $lastError;
 			};
-			$dbh->trace_msg( "->	Eval of adSchemaTables died for $@\n" )
+			$dbh->trace_msg("    !! Eval of adSchemaTables died for $@\n", 5 )
 				if $@;
 			if ( $rs ) {
 				if ( exists $attribs->{Filter} ) {
@@ -711,7 +703,7 @@ my $sch_dbi_to_ado = {
 		return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
 
 		$rs->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION';
-		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order ");
+		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order");
 
 		while ( !$rs->{EOF} ) {
 			my $AdoType    = $rs->{DATA_TYPE   }{Value};
@@ -725,10 +717,10 @@ my $sch_dbi_to_ado = {
 			              || 0;  # Default value to stop warnings ???
 			my $TypeName;
 			my $ado_tis    = DBD::ADO::db::_ado_get_type_info_for( $dbh, $AdoType, $IsFixed, $IsLong );
-			$dbh->trace_msg('  *** ' . $rs->{COLUMN_NAME}{Value} . "($ColSize): $AdoType, $IsFixed, $IsLong\n", 3 );
+			$dbh->trace_msg('    ** ' . $rs->{COLUMN_NAME}{Value} . "($ColSize): $AdoType, $IsFixed, $IsLong\n", 6 );
 			# find the first type which has a large enough COLUMN_SIZE:
 			for my $ti ( sort { $a->{COLUMN_SIZE} <=> $b->{COLUMN_SIZE} } @$ado_tis ) {
-				$dbh->trace_msg("    * => $ti->{TYPE_NAME}($ti->{COLUMN_SIZE})\n", 3 );
+				$dbh->trace_msg("      ** => $ti->{TYPE_NAME}($ti->{COLUMN_SIZE})\n", 7 );
 				if ( $ti->{COLUMN_SIZE} >= $ColSize ) {
 					$TypeName = $ti->{TYPE_NAME};
 					last;
@@ -784,7 +776,7 @@ my $sch_dbi_to_ado = {
 		return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
 
 		$rs->{Sort} = 'TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL';
-		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order ");
+		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order");
 
 		while ( !$rs->{EOF} ) {
 			my @Fields = (map { $_->{Value} } Win32::OLE::in( $rs->Fields ) ) [ 0,1,2,3,6,7 ];
@@ -808,11 +800,11 @@ my $sch_dbi_to_ado = {
 		my $Criteria = \@Criteria if @Criteria;
 		my $QueryType = 'adSchemaForeignKeys';
 		my $RefActions = {
-			'CASCADE'     => 0,
-			'RESTRICT'    => 1,
-			'SET NULL'    => 2,
-			'NO ACTION'   => 3,
-			'SET DEFAULT' => 4,
+		 'CASCADE'     => 0
+		,'RESTRICT'    => 1
+		,'SET NULL'    => 2
+		,'NO ACTION'   => 3
+		,'SET DEFAULT' => 4
 		};
 		my @Rows;
 		my $conn = $dbh->{ado_conn};
@@ -823,7 +815,7 @@ my $sch_dbi_to_ado = {
 		return if DBD::ADO::Failed( $dbh,"Error occurred with call to OpenSchema ($QueryType)");
 
 		$rs->{Sort} = 'PK_TABLE_CATALOG, PK_TABLE_SCHEMA, PK_TABLE_NAME, FK_TABLE_CATALOG, FK_TABLE_SCHEMA, FK_TABLE_NAME';
-		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order ");
+		return if DBD::ADO::Failed( $dbh,"Error occurred defining sort order");
 
 		while ( !$rs->{EOF} ) {
 			my @Fields = (map { $_->{Value} } Win32::OLE::in( $rs->Fields ) ) [ 0..3,6..9,12..14,16,15,17 ];
@@ -944,7 +936,7 @@ my $sch_dbi_to_ado = {
 		my ($dbh) = @_;
 		die 'dbh undefined' unless $dbh;
 
-		$dbh->trace_msg("    -> ado_determine_type_support\n");
+		$dbh->trace_msg("    -> ado_determine_type_support\n", 3 );
 
 		my $conn = $dbh->{ado_conn};
 		my $Enums = DBD::ADO::Const->Enums;
@@ -1068,7 +1060,7 @@ my $sch_dbi_to_ado = {
 			, $rs->{COLUMN_SIZE}->Value
 			, $rs->{TYPE_NAME}->Value
 			));
-			$dbh->trace_msg("    -- data type $type_name: $def\n");
+			$dbh->trace_msg("    -- data type $type_name: $def\n", 5 );
 			@{$ct{$type_name}} = map { $rs->{$_}->Value || '' } @$ado_info;
 			$rs->MoveNext;
 		}
@@ -1094,12 +1086,12 @@ my $sch_dbi_to_ado = {
 				my ($cc) = m/\d+\s+(\D\w?.*)$/;
 				Carp::carp "$cc does not exist in hash\n" unless exists $ct{$cc};
 				my @rec = @{$ct{$cc}};
-				$dbh->trace_msg("Changing type $rec[1] -> $t : @rec\n");
+				$dbh->trace_msg("    ** Changing type $rec[1] -> $t : @rec\n", 6 );
 				$rec[1] = $t;
 				push @{$dbh->{ado_all_types_supported}}, \@rec;
 			}
 		}
-		$dbh->trace_msg("    <- ado_determine_type_support\n");
+		$dbh->trace_msg("    <- ado_determine_type_support\n", 3 );
 		return \@{$dbh->{ado_all_types_supported}};
 	}
 
@@ -1223,7 +1215,7 @@ my $sch_dbi_to_ado = {
     return;
   }
 
-} # ======= Database Handle ========
+} # ====== DATABASE ======
 
 { package DBD::ADO::st; # ====== STATEMENT ======
 
@@ -1259,7 +1251,7 @@ my $sch_dbi_to_ado = {
   {
     my $sql = shift;
     use Text::ParseWords;
-    $^W = 0;
+    local $^W = 0;
     $sql =~ s/\n/ /;
     my $rtn = join(' ', grep { m/\?/ }
       grep { ! m/^['"].*\?/ } &quotewords('\s+', 1, $sql ) );
@@ -1270,25 +1262,25 @@ my $sch_dbi_to_ado = {
 
   sub _refresh {
     my ( $sth ) = @_;
-    $sth->trace_msg("    -> _refresh\n", 5 );
+    $sth->trace_msg("    -> _refresh\n", 3 );
     my $conn = $sth->{ado_conn};
     my $comm = $sth->{ado_comm};
 
     my $Cnt = _params( $sth->FETCH('Statement') );
 
     for ( 0 .. $Cnt - 1 ) {
-      my $Parameter = $comm->CreateParameter("$_",
-        $ado_consts->{DataTypeEnum}{adVarChar},
-        $ado_consts->{ParameterDirectionEnum}{adParamInput},
-        1,
-        '');
+      my $Parameter = $comm->CreateParameter("$_"
+      , $ado_consts->{DataTypeEnum}{adVarChar}
+      , $ado_consts->{ParameterDirectionEnum}{adParamInput}
+      , 1
+      ,'');
       return if DBD::ADO::Failed( $sth,"Unable to CreateParameter");
 
       $comm->Parameters->Append( $Parameter );
-      return if DBD::ADO::Failed( $sth,"Append parameter failed ");
+      return if DBD::ADO::Failed( $sth,"Append parameter failed");
     }
     $sth->STORE('NUM_OF_PARAMS', $Cnt );
-    $sth->trace_msg("    <- _refresh\n", 5 );
+    $sth->trace_msg("    <- _refresh\n", 3 );
     return $Cnt;
   }
 
@@ -1325,11 +1317,11 @@ my $sch_dbi_to_ado = {
         my $pic = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_UI1() | Win32::OLE::Variant::VT_ARRAY(), 10 + length $val );  # $i->{Size}
         $pic->Put( $val );
         $i->{Value} = $pic;
-        $sth->trace_msg("    -- Binary: $i->{Type} $i->{Size}\n");
+        $sth->trace_msg("    -- Binary: $i->{Type} $i->{Size}\n", 5 );
       } else {
         $i->{Size}  = length $val;  # $val? length $val: $ado_type->[2];
         $i->{Value} = $val;         # $val if $val;
-        $sth->trace_msg("    -- Type  : $i->{Type} $i->{Size}\n");
+        $sth->trace_msg("    -- Type  : $i->{Type} $i->{Size}\n", 5 );
       }
     } else {
       $i->{Value} = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_NULL() );
@@ -1396,7 +1388,7 @@ my $sch_dbi_to_ado = {
 			# Call to clear any previous error messages.
 			DBD::ADO::errors($conn);
 
-			$sth->trace_msg("  -- Open record set using cursor type: $cursortype\n", 5 );
+			$sth->trace_msg("    -- Open record set using cursor type: $cursortype\n", 5 );
 			$rs->Open( $comm, undef, $cursortype );
 			return if DBD::ADO::Failed( $sth,"Can't execute statement '$sql'");
 		} else {
@@ -1431,7 +1423,7 @@ my $sch_dbi_to_ado = {
 			my $currowcache = $rs->CacheSize;
 			$sth->trace_msg("    -- changing the CacheSize using RowCacheSize: $rowcache\n", 5 );
 			$rs->CacheSize( $rowcache ) unless $rowcache == $currowcache;
-			return if DBD::ADO::Failed( $sth,"Unable to change CacheSize to RowCacheSize : $rowcache ");
+			return if DBD::ADO::Failed( $sth,"Unable to change CacheSize to RowCacheSize : $rowcache");
 			warn "Changed CacheSize\n";
 		}
 
@@ -1558,6 +1550,7 @@ my $sch_dbi_to_ado = {
 =head1 NAME
 
 DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
+
 
 =head1 SYNOPSIS
 
@@ -1703,6 +1696,7 @@ B<Warning:> This is experimental and may change.
 B<Warning:> Check for the unlikly case that a file Local/DBD/ADO/DSN.pm
 exists in your module search path which causes unwanted side effects when
 loaded.
+
 
 =head1 Enhanced DBI Methods
 

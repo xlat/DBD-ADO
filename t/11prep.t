@@ -48,7 +48,7 @@ ok( $sth = $dbh->prepare("SELECT * FROM $tbl"),"SELECT * FROM $tbl");
 ok( $sth->finish,'Finish');
 ok( $sth = $dbh->prepare("SELECT * FROM $tbl"),"SELECT * FROM $tbl");
 ok( !( $sth = undef ),'Set sth to undefined');
-ok( $sth = $dbh->prepare("SELECT * FROM $tbl"),"SELECT * FROM $tbl");
+ok( $sth = $dbh->prepare("SELECT * FROM $tbl", { ado_refresh => 2 } ),"SELECT * FROM $tbl ( ado_refresh => 2 )");
 ok( $sth->execute,'Execute');
 ok( !( $sth = undef ),'Set sth to undefined');
 ok( $dbh->do("DROP TABLE $tbl"),"DROP TABLE $tbl");
