@@ -1,6 +1,4 @@
 
-Call disconnect() from DESTROY()
-
 install_method('ado_open_schema')
 
 Adjust return codes wrt the spec
@@ -12,9 +10,6 @@ Add $sth->{ParamValues}
 Improve type_info_all
 
 Add $dbh->last_insert_id
-
-Add data_sources() tests
-Drop data_sources() test from 02simple.t
 
 Reimplement the t/23warn.t tests.
 

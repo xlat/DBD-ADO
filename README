@@ -1,52 +1,52 @@
 NAME
 
-    DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
+  DBD::ADO - A DBI driver for Microsoft ADO (Active Data Objects)
 
 SYNOPSIS
 
-      use DBI;
+  use DBI;
 
-      $dbh = DBI->connect("dbi:ADO:dsn", $user, $passwd);
+  $dbh = DBI->connect("dbi:ADO:dsn", $user, $passwd);
 
-            Options in the connect string:
-            dbi:ADO:dsn;CommandTimeout=60 (your number)
-            dbi:ADO:dsn;ConnectTimeout=60 (your number)
-            or include both ConnectTimeout and CommandTimeout.
+    Options in the connect string:
+    dbi:ADO:dsn;CommandTimeout=60 (your number)
+    dbi:ADO:dsn;ConnectTimeout=60 (your number)
+    or include both ConnectTimeout and CommandTimeout.
 
-            The dsn may be a standard ODBC dsn or a dsn-less.
-            See the ADO documentation for more information on
-            the dsn-less connection.
+    The dsn may be a standard ODBC dsn or a dsn-less.
+    See the ADO documentation for more information on
+    the dsn-less connection.
 
-      # See the DBI module documentation for full details
+  # See the DBI module documentation for full details
 
 DESCRIPTION
 
-    The DBD::ADO module supports ADO access on a Win32 machine. DBD::ADO is
-    written to support the standard DBI interface to data sources.
+  The DBD::ADO module supports ADO access on a Win32 machine. DBD::ADO is
+  written to support the standard DBI interface to data sources.
 
 Connection
 
-      $dbh = DBI->connect("dbi:ADO:dsn", $user, $passwd, $attribs);
+    $dbh = DBI->connect("dbi:ADO:$dsn", $user, $passwd, $attribs );
 
-            Connection supports dsn and dsn-less calls.
+  Connection supports dsn and dsn-less calls.
 
-            $dbh = DBI->connect( "dbi:ADO:File Name=oracle.udl",
-                    $user, $passwd, {RaiseError => [0|1], PrintError => [0|1],
-                    AutoCommit => [0|1]});
+    $dbh = DBI->connect('dbi:ADO:File Name=oracle.udl', $user, $passwd,
+      { RaiseError => [0|1], PrintError => [0|1], AutoCommit => [0|1]} );
 
-            In addition the following attributes may be set in the connect string:
-                    Attributes
-                    CommandTimeout
-                    ConnectionString
-                    ConnectionTimeout
-                    CursorLocation
-                    DefaultDatabase
-                    IsolationLevel
-                    Mode
-                    Provider
+  In addition the following attributes may be set in the connect string:
 
-            WARNING: The application is responsible for passing the correct
-            information when setting any of these attributes.
+    Attributes
+    CommandTimeout
+    ConnectionString
+    ConnectionTimeout
+    CursorLocation
+    DefaultDatabase
+    IsolationLevel
+    Mode
+    Provider
+
+  Warning: The application is responsible for passing the correct
+  information when setting any of these attributes.
 
 
 Functions support
@@ -241,41 +241,54 @@ Enhanced DBI Methods
 
 Warnings
 
-    Support for type_info_all is supported, however, you're not using
-    a true OLE DB provider (using the MS OLE DB -> ODBC), the first
-    hash may not be the "best" solution for the data type.
-    adSchemaProviderTypes does provide for a "best match" column, however
-    the MS OLE DB -> ODBC provider does not support the best match.
-    Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
+  Support for type_info_all is supported, however, you're not using
+  a true OLE DB provider (using the MS OLE DB -> ODBC), the first
+  hash may not be the "best" solution for the data type.
+  adSchemaProviderTypes does provide for a "best match" column, however
+  the MS OLE DB -> ODBC provider does not support the best match.
+  Currently the types are sorted by DATA_TYPE BEST_MATCH IS_LONG ...
 
 ADO
 
-    It is strongly recommended that you use the latest version of ADO (2.1
-    at the time this was written). You can download it from:
+  It is strongly recommended that you use the latest version of ADO (2.1
+  at the time this was written). You can download it from:
 
-      http://www.microsoft.com/Data/download.htm
+    http://www.microsoft.com/Data/download.htm
 
 AUTHORS
 
-    Tim Bunce and Phlip. With many thanks to Jan Dubois and Jochen Wiedmann
-    for additions, debuggery and general help.
-    Special thanks to Thomas Lowery, who maintained this module 2001-2003.
-    Current maintainer is Steffen Goeldner.
+  Tim Bunce and Phlip. With many thanks to Jan Dubois and Jochen Wiedmann
+  for additions, debuggery and general help.
+  Special thanks to Thomas Lowery, who maintained this module 2001-2003.
+  Current maintainer is Steffen Goeldner.
 
 SUPPORT
 
-    This software is supported via the dbi-users mailing list.
-    For more information and to keep informed about progress you can join the
-    mailing list by sending a message to dbi-users-help@perl.org
+  This software is supported via the dbi-users mailing list.
+  For more information and to keep informed about progress you can join the
+  mailing list by sending a message to dbi-users-help@perl.org
 
-    Please post details of any problems (or changes you needed to make) to
-    dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
+  Please post details of any problems (or changes you needed to make) to
+  dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
+
+COPYRIGHT
+
+  Copyright (c) 1998, Tim Bunce
+  Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
+  Copyright (c) 2000, Tim Bunce, Thomas Lowery
+  Copyright (c) 2001, Tim Bunce, Thomas Lowery, Steffen Goeldner
+  Copyright (c) 2002, Thomas Lowery, Steffen Goeldner
+  Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
+
+  All rights reserved.
+
+  You may distribute under the terms of either the GNU General Public
+  License or the Artistic License, as specified in the Perl README file.
 
 SEE ALSO
 
-    ADO Reference book: ADO 2.0 Programmer's Reference, David Sussman and
-    Alex Homer, Wrox, ISBN 1-861001-83-5. If there's anything better please
-    let me know.
+  ADO Reference book: ADO 2.0 Programmer's Reference, David Sussman and
+  Alex Homer, Wrox, ISBN 1-861001-83-5. If there's anything better please
+  let me know.
 
-    http://www.able-consulting.com/tech.htm
-
+  http://www.able-consulting.com/tech.htm

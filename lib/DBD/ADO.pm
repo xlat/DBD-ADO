@@ -9,17 +9,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh $err $errstr $state);
 
-  $VERSION = '2.81';
-
-# Copyright (c) 1998, Tim Bunce
-# Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
-# Copyright (c) 2000, Tim Bunce, Phlip, Thomas Lowery
-# Copyright (c) 2001, Tim Bunce, Phlip, Thomas Lowery, Steffen Goeldner
-# Copyright (c) 2002, Tim Bunce, Phlip, Thomas Lowery, Steffen Goeldner
-# Copyright (c) 2003, Tim Bunce, Phlip, Thomas Lowery, Steffen Goeldner
-#
-# You may distribute under the terms of either the GNU General Public
-# License or the Artistic License, as specified in the Perl README file.
+  $VERSION = '2.82';
 
   $drh    = undef;  # holds driver handle once initialised
   $err    = 0;      # The $DBI::err value
@@ -323,37 +313,33 @@ my $sch_dbi_to_ado = {
 		my ($dbh) = @_;
 		my $conn = $dbh->{ado_conn};
 		local $Win32::OLE::Warn = 0;
-		$dbh->trace_msg( "<- State: (" . $conn->State  . ")\n");
-		if ($conn->State & $ado_consts->{ObjectStateEnum}{adStateOpen}) {
-			my $auto = $dbh->{AutoCommit};
+		$dbh->trace_msg('    -- State: ' . $conn->State . "\n");
+		if ( $conn->State & $ado_consts->{ObjectStateEnum}{adStateOpen} ) {
 			# Change the connection attribute so Commit/Rollback
 			# does not start another transaction.
 			$conn->{Attributes} = 0;
 			my $lastError = DBD::ADO::errors($conn);
 			return $dbh->set_err( $DBD::ADO::err || -1,
 				"Failed setting CommitRetaining: $lastError") #-2147168242
-			if $lastError and $lastError !~ m/-2147168242/;
+			if $lastError && $lastError !~ m/-2147168242/;
+			$dbh->trace_msg('    -- Modified ADO Connection Attributes: ' . $conn->{Attributes} . "\n");
 
-			$dbh->trace_msg( "<- modified connection Attributes " . $conn->{Attributes} . "\n");
-			$dbh->trace_msg( "<- AutoCommit -> $auto  Provider Support -> $dbh->{ado_provider_support_auto_commit} Comments -> $dbh->{ado_provider_auto_commit_comments}\n");
-
+			my $auto = $dbh->{AutoCommit};
+			$dbh->trace_msg("    -- AutoCommit: $auto, Provider Support: $dbh->{ado_provider_support_auto_commit}, Comments: $dbh->{ado_provider_auto_commit_comments}\n");
 			$conn->RollbackTrans unless $auto and
 				not $dbh->{ado_provider_support_auto_commit};
-
 			$lastError = DBD::ADO::errors($conn);
-			return $dbh->set_err( $DBD::ADO::err || -1, "Failed to execute rollback: $lastError")
-				if $lastError and $lastError !~ m/-2147168242/;
-			# Provider error about transaction not started.  Ignore message,
-			# clear error codes.
-			DBD::ADO::errors($conn) if ($lastError and $lastError =~ m/-2147168242/);
+			return $dbh->set_err( $DBD::ADO::err || -1,
+				"Failed to execute rollback: $lastError")
+			if $lastError && $lastError !~ m/-2147168242/;
+			# Provider error about txn not started. Ignore message, clear error codes.
+			DBD::ADO::errors($conn) if $lastError && $lastError =~ m/-2147168242/;
 
 			$conn->Close;
-			$conn = undef;
-			$dbh->{ado_conn} = undef;
 		}
-
-		$dbh->{ado_conn} = undef if defined $dbh->{ado_conn};
-		$dbh->SUPER::STORE('Active' => 0 );
+		$conn = undef;
+		$dbh->{ado_conn} = undef;
+		$dbh->SUPER::STORE('Active', 0 );
 		return 1;
 	}
 
@@ -1356,61 +1342,11 @@ my $sch_dbi_to_ado = {
     return $cv;  # Didn't change the value.
   }
 
-	sub DESTROY {  # Database handle
-		my ($dbh) = @_;
-
-		Carp::croak "Database handle called with undefined dbh ... very odd!"
-			unless defined $dbh;
-
-		$dbh->trace_msg( "-> Database Handle Destroy:" , 2 );
-
-		my $conn = $dbh->{ado_conn};
-
-		$dbh->trace_msg( "-> Database Handle Destroy:  conn undefined " .
-			defined $conn ? 'No' : 'Yes' , 2 );
-
-		if ( defined $conn ) {
-			Carp::carp "Connection open, destroy";
-			local ($Win32::OLE::Warn);
-			$Win32::OLE::Warn = 0;
-			# Determine if a connection is made, close an open connection.
-			if (defined $conn and
-				$conn->State & $ado_consts->{ObjectStateEnum}{adStateOpen}) {
-
-				$dbh->trace_msg( "<- State: (" . $conn->State  . ")\n");
-				my $auto = $dbh->{AutoCommit};
-
-				# Change the connection attribute so Commit/Rollback
-				# does not start another transaction.
-				$conn->{Attributes} = 0;
-				my $lastError = DBD::ADO::errors($conn);
-				return $dbh->set_err( $DBD::ADO::err || -1,
-						"Failed setting CommitRetaining: $lastError") #-2147168242
-				if $lastError and $lastError !~ m/-2147168242/;
-
-				$dbh->trace_msg( "<- modified connection Attributes " . $conn->{Attributes} . "\n");
-				$dbh->trace_msg( "<- AutoCommit -> $auto  Provider Support -> $dbh->{ado_provider_support_auto_commit} Comments -> $dbh->{ado_provider_auto_commit_comments}\n");
-
-				$conn->RollbackTrans unless $auto and
-					not $dbh->{ado_provider_support_auto_commit};
-
-				$lastError = DBD::ADO::errors($conn);
-				return $dbh->set_err( $DBD::ADO::err || -1, "Failed to execute rollback: $lastError")
-					if $lastError and $lastError !~ m/-2147168242/;
-				# Provider error about transaction not started.  Ignore message,
-				# clear error codes.
-				DBD::ADO::errors($conn) if ($lastError and $lastError =~ m/-2147168242/);
-
-				$conn->Close;
-				$conn = undef;
-			}
-		}
-		$dbh->trace_msg( "<- Database Handle Destroy:" , 2 );
-
-		$dbh->{ado_conn} = undef;
-		$dbh = undef;
-		return;
-	} # Destory Database handle
+  sub DESTROY {
+    my ($dbh) = @_;
+    $dbh->disconnect if $dbh->FETCH('Active');
+    return;
+  }
 
 } # ======= Database Handle ========
 
@@ -1920,27 +1856,27 @@ data sources.
 
 =head1 Connection
 
-  $dbh = DBI->connect("dbi:ADO:dsn", $user, $passwd, $attribs);
+  $dbh = DBI->connect("dbi:ADO:$dsn", $user, $passwd, $attribs );
 
-	Connection supports dsn and dsn-less calls.
+Connection supports dsn and dsn-less calls.
 
-	$dbh = DBI->connect( "dbi:ADO:File Name=oracle.udl",
-		$user, $passwd, {RaiseError => [0|1], PrintError => [0|1],
-		AutoCommit => [0|1]});
+  $dbh = DBI->connect('dbi:ADO:File Name=oracle.udl', $user, $passwd,
+    { RaiseError => [0|1], PrintError => [0|1], AutoCommit => [0|1]} );
 
-	In addition the following attributes may be set in the connect string:
-		Attributes
-		CommandTimeout
-		ConnectionString
-		ConnectionTimeout
-		CursorLocation
-		DefaultDatabase
-		IsolationLevel
-		Mode
-		Provider
+In addition the following attributes may be set in the connect string:
 
-	WARNING: The application is responsible for passing the correct
-	information when setting any of these attributes.
+  Attributes
+  CommandTimeout
+  ConnectionString
+  ConnectionTimeout
+  CursorLocation
+  DefaultDatabase
+  IsolationLevel
+  Mode
+  Provider
+
+B<Warning:> The application is responsible for passing the correct
+information when setting any of these attributes.
 
 
 =head1 Functions support
@@ -2169,6 +2105,20 @@ mailing list by sending a message to dbi-users-help@perl.org
 
 Please post details of any problems (or changes you needed to make) to
 dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
+
+=head1 COPYRIGHT
+
+  Copyright (c) 1998, Tim Bunce
+  Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
+  Copyright (c) 2000, Tim Bunce, Thomas Lowery
+  Copyright (c) 2001, Tim Bunce, Thomas Lowery, Steffen Goeldner
+  Copyright (c) 2002, Thomas Lowery, Steffen Goeldner
+  Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
+
+  All rights reserved.
+
+  You may distribute under the terms of either the GNU General Public
+  License or the Artistic License, as specified in the Perl README file.
 
 =head1 SEE ALSO
 

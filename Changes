@@ -1,3 +1,14 @@
+2003-12-07  2.82
+
+  Replaced duplicated code in DESTROY() with a call to disconnect().
+
+  Removed the deprecated Enums() method from DBD::ADO::TypeInfo.
+
+  Added t/02ads.t to test data_sources() (and removed a similar test
+  from t/02simple.t).
+
+  Removed type_info() tests from t/17conn.t.
+
 2003-11-30  2.81
 
   Fixed Makefile.PL to work with strict 1.03 (perl 5.8.1.),

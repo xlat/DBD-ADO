@@ -12,7 +12,7 @@ use vars qw($tests);
 use Test::More;
 
 if ( defined $ENV{DBI_DSN} ) {
-  plan tests => 24;
+  plan tests => 23;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -87,10 +87,6 @@ ok( $count != 0,'Test group by queries');
 
 $sth->finish;
 #$rc = ADOTEST::tab_delete( $dbh );
-
-my @data_sources = DBI->data_sources('ADO');
-# print "Data sources:\n\t", join("\n\t",@data_sources),"\n\n";
-ok( $#data_sources != 0,'Test data sources ... not implemented');
 
 my $sth1 = $dbh->prepare("SELECT * FROM $ADOTEST::table_name ORDER BY A")
   or warn $dbh->errstr;

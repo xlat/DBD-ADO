@@ -6,9 +6,7 @@ use warnings;
 use Win32::OLE();
 use Win32::OLE::TypeInfo();
 
-use vars qw($VERSION);
-
-$VERSION = '0.05';
+$DBD::ADO::Const::VERSION = '0.06';
 
 my $ProgId  = 'ADODB.Connection';
 my $VarSkip = Win32::OLE::TypeInfo::VARFLAG_FHIDDEN()

@@ -6,7 +6,7 @@ use warnings;
 use DBI();
 use DBD::ADO::Const();
 
-$DBD::ADO::TypeInfo::VERSION = '2.79';
+$DBD::ADO::TypeInfo::VERSION = '2.80';
 
 my $Enums = DBD::ADO::Const->Enums;
 my $Dt = $Enums->{DataTypeEnum};
@@ -173,17 +173,6 @@ sub ado2dbi {
   }
   return $SqlType;
 }
-
-# -----------------------------------------------------------------------------
-sub Enums
-# -----------------------------------------------------------------------------
-{
-  my $class = shift;
-
-  warn 'DBD::ADO::TypeInfo->Enums is deprecated! Use DBD::ADO::Const->Enums instead';
-
-  return DBD::ADO::Const->Enums;
-}
 # -----------------------------------------------------------------------------
 1;
 
@@ -194,11 +183,12 @@ DBD::ADO::TypeInfo - ADO TypeInfo
 =head1 SYNOPSIS
 
   use DBD::ADO::TypeInfo();
+  ...
 
 =head1 DESCRIPTION
 
-DBD::ADO::TypeInfo->Enums is deprecated!
-Use DBD::ADO::Const->Enums instead.
+This module helps to handle DBI datatype information.
+It provides mappings between DBI (SQL/CLI, ODBC) and ADO datatypes.
 
 =head1 AUTHOR
 
