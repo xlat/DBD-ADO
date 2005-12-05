@@ -9,7 +9,7 @@ use DBI ();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 5;
+  plan tests => 7;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -26,14 +26,20 @@ for my $ti ( @ti ) {
 {
   my $tia = $dbh->type_info_all;
   is( ref $tia,'ARRAY','type_info_all');
-  shift @$tia;
+
+  my $idx = shift @$tia;
+  is( ref $idx,'HASH','index hash');
+
   print '# ', DBI::neat_list( $_ ), "\n" for @$tia;
 }
 $dbh->{ado_ti_ver} = 1;
 {
   my $tia = $dbh->type_info_all;
   is( ref $tia,'ARRAY','type_info_all');
-  shift @$tia;
+
+  my $idx = shift @$tia;
+  is( ref $idx,'HASH','index hash');
+
   print '# ', DBI::neat_list( $_ ), "\n" for @$tia;
 }
 

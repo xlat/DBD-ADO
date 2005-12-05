@@ -5,8 +5,13 @@ use warnings;
 
 use Win32::OLE();
 use Win32::OLE::TypeInfo();
+use Win32::OLE::Variant();
 
-$DBD::ADO::Const::VERSION = '0.06';
+$DBD::ADO::Const::VERSION = '0.07';
+
+$DBD::ADO::Const::VT_I4_BYREF = Win32::OLE::Variant::VT_I4()
+                              | Win32::OLE::Variant::VT_BYREF()
+                              ;
 
 my $ProgId  = 'ADODB.Connection';
 my $VarSkip = Win32::OLE::TypeInfo::VARFLAG_FHIDDEN()
@@ -24,6 +29,8 @@ sub Enums
   return $Enums if $Enums;
 
   my $TypeLib = Win32::OLE->new( $ProgId )->GetTypeInfo->GetContainingTypeLib;
+
+  return $Enums = $TypeLib->Enums if defined &Win32::OLE::TypeLib::Enums;
 
   for my $i ( 0 .. $TypeLib->_GetTypeInfoCount - 1 )
   {
@@ -88,12 +95,38 @@ namespace preserved.
 The Enums() method of this package return a hash of hashes for exactly this
 purpose.
 
-=head1 TODO
+=head1 BENCHMARK
 
-Try a XS implementation and benchmark speed-up.
+The drawback of the Enums() method is its poor performance, as the following
+benchmark shows:
 
-Suggest a more general version (parameterized by $ProgId) for inclusion
-into Win32::OLE.
+  require DBD::ADO::Const;     # 0.50 CPU
+  DBD::ADO::Const->Enums;      # 0.30 CPU
+                               # 0.80 CPU
+
+However, the previous alternative didn't perform better:
+
+  require Win32::OLE::Const;   # 0.89 CPU
+  Win32::OLE::Const->Load(...) # 0.03 CPU
+                               # 0.92 CPU
+
+It seems that all available type libraries are checked (for whatever reason).
+In a networking environment, the performance may be unacceptable.
+
+A more general version (parameterized by TypeLib), implemented in XS
+(similar to Win32::OLE::Const::_Constants), looks promising:
+
+  require Win32::OLE;          # 0.24 CPU
+  $TypeLib->Enums;             # 0.04 CPU
+                               # 0.28 CPU
+
+where
+
+  $TypeLib = Win32::OLE->new('ADODB.Connection')
+               ->GetTypeInfo->GetContainingTypeLib;
+
+Hopefully, this implementation (see ex/Enums.patch) finds its way
+into Win32::OLE some day ...
 
 =head1 AUTHOR
 
@@ -101,7 +134,7 @@ Steffen Goeldner (sgoeldner@cpan.org)
 
 =head1 COPYRIGHT
 
-Copyright (c) 2002-2003 Steffen Goeldner. All rights reserved.
+Copyright (c) 2002-2005 Steffen Goeldner. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 

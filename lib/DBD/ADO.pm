@@ -4,15 +4,11 @@
   use strict;
   use DBI();
   use Win32::OLE();
-  use vars qw($VERSION $drh $err $errstr $state $errcum);
+  use vars qw($VERSION $drh);
 
-  $VERSION = '2.94';
+  $VERSION = '2.95';
 
-  $drh    = undef;  # holds driver handle once initialised
-  $err    =  0;     # The $DBI::err value
-  $errstr = '';
-  $state  = '';
-  $errcum =  0;
+  $drh = undef;
 
 
   sub driver {
@@ -32,23 +28,23 @@
 
 
   sub errors {
-    my $Conn = shift;
-    my $MaxErrors = shift || 50;
-    my @Err  = ();
+    my $h = shift;
+    my $Cxn = $h->{ado_conn};
+    my $MaxErrors = $h->{ado_max_errors} || 50;
+    my @Err = ();
 
     my $lastError = Win32::OLE->LastError;
     if ( $lastError ) {
-      $DBD::ADO::errcum = $DBD::ADO::err = 0+$lastError;
-      push @Err,"\n  Last error : $DBD::ADO::err\n\n$lastError";
+      $h->{ado_errcum} = $h->{ado_err} = 0+$lastError;
+      push @Err,"\n  Last error : $h->{ado_err}\n\n$lastError";
     }
     else {
-      $DBD::ADO::err    =  0;
-      $DBD::ADO::errstr = '';
-      $DBD::ADO::state  = '';
-      $DBD::ADO::errcum =  0;
+      $h->{ado_errcum} = $h->{ado_err} = 0;
     }
-    if ( ref $Conn ) {
-      my $Errors = $Conn->Errors;
+    $h->{ado_state} = '';
+
+    if ( ref $Cxn ) {
+      my $Errors = $Cxn->Errors;
       if ( $Errors ) {
         my $Count = $Errors->Count;
         for ( my $i = 1; $i <= $Count; $i++ ) {
@@ -61,8 +57,8 @@
           push @Err, sprintf "%19s : %s", $_, $err->$_ ||'' for qw(
             Description HelpContext HelpFile NativeError Number Source SQLState);
           push @Err,'    ';
-          $DBD::ADO::errcum |= $err->Number;
-          $DBD::ADO::state   = $err->SQLState ||'';
+          $h->{ado_errcum} |= $err->Number;
+          $h->{ado_state}   = $err->SQLState ||'';
         }
         $Errors->Clear;
       }
@@ -74,8 +70,7 @@
   sub Failed {
     my $h   = shift;
 
-    my $lastError = DBD::ADO::errors( $h->{ado_conn}, $h->{ado_max_errors} )
-      or return 0;
+    my $lastError = DBD::ADO::errors( $h ) or return 0;
 
     my ( $package, $filename, $line ) = caller;
     my $s = shift()
@@ -84,9 +79,9 @@
           . "\n  Filename   : $filename"
           . "\n  Line       : $line"
           ;
-    $DBD::ADO::err = 0 unless $DBD::ADO::errcum & 1 << 31;  # oledberr.h
-    my $state = $DBD::ADO::state if length $DBD::ADO::state == 5;
-    $h->set_err( $DBD::ADO::err, $s . $lastError, $state );
+    $h->{ado_err} = 0 unless $h->{ado_errcum} & 1 << 31;  # oledberr.h
+    my $state = $h->{ado_state} if length $h->{ado_state} == 5;
+    $h->set_err( $h->{ado_err}, $s . $lastError, $state );
     return 1;
   }
 
@@ -163,7 +158,7 @@
 		};
 		if ( $@ ) {
 			$dbh->{ado_txn_capable} = 0;
-			my $lastError = DBD::ADO::errors( $conn );
+			my $lastError = DBD::ADO::errors( $dbh );
 			$drh->trace_msg("    !! Can't determine transaction support: $lastError\n", 5 );
 		}
 		$drh->trace_msg("    -- Transaction support: $dbh->{ado_txn_capable}\n", 5 );
@@ -229,8 +224,8 @@
         # Change the connection attribute so Commit/Rollback
         # does not start another transaction.
         $conn->{Attributes} = 0;
-        my $lastError = DBD::ADO::errors( $conn );
-        return $dbh->set_err( $DBD::ADO::err || -1,"Can't set CommitRetaining: $lastError") if $lastError && $lastError !~ m/-2147168242/;
+        my $lastError = DBD::ADO::errors( $dbh );
+        return $dbh->set_err( -925,"Can't set CommitRetaining: $lastError") if $lastError && $lastError !~ m/-2147168242/;
         $dbh->trace_msg('    -- Modified ADO Connection Attributes: ' . $conn->{Attributes} . "\n", 5 );
 
         $dbh->rollback if !$dbh->{AutoCommit} && $dbh->{ado_txn_capable};
@@ -371,7 +366,7 @@
         $comm->Parameters->Refresh;
         $Cnt = $comm->Parameters->Count;
       };
-      my $lastError = DBD::ADO::errors( $conn );
+      my $lastError = DBD::ADO::errors( $dbh );
       if ( $lastError ) {
         $dbh->trace_msg("    !! Refresh error: $lastError\n", 5 );
         $sth->{ado_refresh} = 2;
@@ -499,7 +494,7 @@
 			eval {
 				local $Win32::OLE::Warn = 0;
 				$rs = $conn->OpenSchema( $Enums->{SchemaEnum}{adSchemaCatalogs} );
-				my $lastError = DBD::ADO::errors( $conn );
+				my $lastError = DBD::ADO::errors( $dbh );
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die $lastError if $lastError;
 			};
@@ -541,7 +536,7 @@
 			eval {
 				local $Win32::OLE::Warn = 0;
 				$rs = $conn->OpenSchema( $Enums->{SchemaEnum}{adSchemaSchemata} );
-				my $lastError = DBD::ADO::errors( $conn );
+				my $lastError = DBD::ADO::errors( $dbh );
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die $lastError if $lastError;
 			};
@@ -598,7 +593,7 @@
 			eval {
 				local $Win32::OLE::Warn = 0;
 				$rs = $conn->OpenSchema( $Enums->{SchemaEnum}{adSchemaTables}, @Criteria ? \@Criteria : undef );
-				my $lastError = DBD::ADO::errors( $conn );
+				my $lastError = DBD::ADO::errors( $dbh );
 				$lastError = undef if $lastError =~ m/0x80020007/;
 				die $lastError if $lastError;
 			};
@@ -824,7 +819,7 @@
         local $Win32::OLE::Warn = 0;
         my $conn = $dbh->{ado_conn};
         $value = $conn->{$key};
-        my $lastError = DBD::ADO::errors( $conn );
+        my $lastError = DBD::ADO::errors( $dbh );
         $lastError = undef if $lastError =~ m/0x80020007/;
         die $lastError if $lastError;
       };
@@ -866,7 +861,7 @@
 				local $Win32::OLE::Warn = 0;
 				my $conn = $dbh->{ado_conn};
 				$conn->{$key} = $value;
-				my $lastError = DBD::ADO::errors( $conn );
+				my $lastError = DBD::ADO::errors( $dbh );
 				die $lastError if $lastError;
 			};
 			Carp::carp $@ if $@ && $dbh->FETCH('Warn');
@@ -907,7 +902,7 @@
 
     return $dbh->SUPER::do( $sql, @_ ) if @_;
 
-    my $Rows = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_I4() | Win32::OLE::Variant::VT_BYREF(), 0 );
+    my $Rows = Win32::OLE::Variant->new( $DBD::ADO::Const::VT_I4_BYREF, 0 );
     $dbh->{ado_conn}->Execute( $sql, $Rows, 129 );  # adCmdText | adExecuteNoRecords
     return if DBD::ADO::Failed( $dbh,"Can't Execute '$sql'");
     return $Rows->Value || '0E0';
@@ -933,8 +928,6 @@
   $DBD::ADO::st::imp_data_size = 0;
 
   my $Enums = DBD::ADO::Const->Enums;
-
-  my $VT_I4_BYREF = Win32::OLE::Variant::VT_I4() | Win32::OLE::Variant::VT_BYREF();
 
 
   sub blob_read {
@@ -1026,7 +1019,7 @@
         $sth->trace_msg("    -- Binary: $i->{Type} $i->{Size}\n", 5 );
       }
       else {
-        $i->{Size}  = length $value;  # $value? length $value: $ado_type->[2];
+        $i->{Size}  = defined $attr->{ado_size} ? $attr->{ado_size} : length $value;
         $i->{Value} = $value;         # $value if $value;
         $sth->trace_msg("    -- Type  : $i->{Type} $i->{Size}\n", 5 );
       }
@@ -1043,7 +1036,7 @@
 		my $conn = $sth->{ado_conn};
 		my $comm = $sth->{ado_comm};
 		my $sql  = $sth->FETCH('Statement');
-		my $rows = Win32::OLE::Variant->new( $VT_I4_BYREF, 0 );
+		my $rows = Win32::OLE::Variant->new( $DBD::ADO::Const::VT_I4_BYREF, 0 );
 		my $rs;
 
     $sth->finish if $sth->{Active};
@@ -1097,7 +1090,7 @@
     if ( defined $sth->{ado_cachesize} && $sth->{ado_cachesize} > 0 ) {
       $sth->trace_msg("    -- changing CacheSize $rs->{CacheSize} => $sth->{ado_cachesize}\n", 5 );
       $rs->{CacheSize} = $sth->{ado_cachesize};
-      my $lastError = DBD::ADO::errors( $conn );
+      my $lastError = DBD::ADO::errors( $sth );
       $sth->set_err( 0, $lastError ) if $lastError;
     }
 
@@ -1673,6 +1666,11 @@ More detailed notes can be found at
 
 It seems that the size of the first inserted string is sticky.
 Inserted strings longer than the first one are truncated.
+
+As a workaround, the C<ado_size> attribute for C<bind_param> was
+introduced in version 2.95:
+
+  $sth->bind_param( $p_num, $bind_value, { ado_size => $size } );
 
 =item MSDAORA may have problems with client-side cursors
 

@@ -10,7 +10,7 @@ use DBD_TEST();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 33;
+  plan tests => 26;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -31,7 +31,7 @@ ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
     $rows++;
   }
   my $names = $sth->{NAME};
-  is( $names[$_], $names->[$_],"Column: $names[$_] $names->[$_]")
+  is( $names->[$_], $names[$_],"Column: $names->[$_] $names[$_]")
     for 0 .. $#names;
 
   is( $dbh->tables, $rows,"Total tables count: $rows");
@@ -148,12 +148,14 @@ $sth = undef;
 $sth = $dbh->table_info('','','','%');
 ok( defined $sth, q(table_info('','','','%') tested) );
 if ( $sth ) {
+  my $err = 0;
   my $ref = $sth->fetchall_hashref('TABLE_TYPE');
   for my $type ( sort keys %$ref ) {
-    my $sth = $dbh->table_info( undef, undef, undef, $type );
-    ok( defined $sth,"table_info( undef, undef, undef, $type ) tested");
+    print "# $type:\n";
+    my $sth = $dbh->table_info( undef, undef, undef, $type ) or $err++;
     DBD_TEST::dump_results( $sth );
   }
+  is( $err, 0,'all table types selected');
 }
 $sth = undef;
 

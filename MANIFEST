@@ -5,6 +5,7 @@ Makefile.PL
 META.yml
 README
 ToDo
+ex/Enums.patch
 ex/Local/DBD/ADO/DSN.pm
 ex/OpenSchema.pl
 ex/Provider.pl
