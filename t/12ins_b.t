@@ -18,7 +18,7 @@ my $dat = [
 , [ 4,'D12345','D' x 32,'1998-05-16']
 ];
 if ( defined $ENV{DBI_DSN} ) {
-  plan tests => 4 + 2 * ( 3 + 3 * @$dat ) * @col;
+  plan tests => 4 +  @col * 3 * ( 3 + 3 * @$dat );
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -33,14 +33,19 @@ pass('Database connection created');
 
 ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
 
-for my $size ( undef, 32 ) {
-  for my $i ( 0..$#col ) {
+for my $i ( 0..$#col ) {
+  my $ti  = DBD_TEST::get_type_for_column( $dbh, $col[$i] );
+  my @attr = (
+    { TYPE => $ti->{DATA_TYPE}, ado_size => undef }
+  , { TYPE => $ti->{DATA_TYPE}, ado_size =>    32 }
+  ,           $ti->{DATA_TYPE}
+  );
+  for my $attr ( @attr ) {
     ok( $dbh->do( $_ ),"do $i: $_") for "DELETE FROM $tbl";
-    my $ti  = DBD_TEST::get_type_for_column( $dbh, $col[$i] );
     my $sth = $dbh->prepare("INSERT INTO $tbl( $col[$i] ) VALUES( ? )");
     ok( defined $sth,"prepare $i: $sth->{Statement}");
     for ( @$dat ) {
-      ok( $sth->bind_param( 1, $_->[$i], { TYPE => $ti->{DATA_TYPE}, ado_size => $size } ),"bind_param: $col[$i] => $_->[$i]");
+      ok( $sth->bind_param( 1, $_->[$i], $attr ),"bind_param: $col[$i] => $_->[$i]");
       ok( $sth->$_, $_ ) for 'execute';
     }
     my $a = $dbh->selectcol_arrayref("SELECT $col[$i] FROM $tbl");

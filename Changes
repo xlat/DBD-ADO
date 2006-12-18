@@ -1,3 +1,16 @@
+2006-12-17  2.96
+
+  Implemented statistics_info().
+  Added tests (t/45ddst.t).
+
+  Fixed bug: Application uses a value of the wrong type for the current
+  operation, reported by amonotod.
+
+  Fixed bug: Can't use string ("3") as a HASH ref while "strict refs"
+  in use at ADO.pm line 1022, reported by John Derrick.
+
+  Added support for the adExecuteStream option thanks to Luke Bakken.
+
 2005-12-04  2.95
 
   Changed bind_param() to use an optional ado_size attribute.

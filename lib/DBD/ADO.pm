@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh);
 
-  $VERSION = '2.95';
+  $VERSION = '2.96';
 
   $drh = undef;
 
@@ -327,19 +327,20 @@
 
 		my ( $outer, $sth ) = DBI::_new_sth( $dbh, { Statement => $statement } );
 
-		$sth->{ado_cachesize}  = $dbh->{ado_cachesize};
-		$sth->{ado_comm}       = $comm;
-		$sth->{ado_conn}       = $conn;
-		$sth->{ado_cursortype} = $dbh->{ado_cursortype} || $attr->{CursorType};
-		$sth->{ado_fields}     = undef;
-		$sth->{ado_max_errors} = $dbh->{ado_max_errors};
-		$sth->{ado_refresh}    = 1;
-		$sth->{ado_rownum}     = -1;
-		$sth->{ado_rows}       = -1;
-		$sth->{ado_rowset}     = undef;
-		$sth->{ado_type}       = undef;
-		$sth->{ado_usecmd}     = undef;
-		$sth->{ado_users}      = undef;
+		$sth->{ado_cachesize}     = $dbh->{ado_cachesize};
+		$sth->{ado_comm}          = $comm;
+		$sth->{ado_conn}          = $conn;
+		$sth->{ado_cursortype}    = $dbh->{ado_cursortype} || $attr->{CursorType};
+		$sth->{ado_fields}        = undef;
+		$sth->{ado_max_errors}    = $dbh->{ado_max_errors};
+		$sth->{ado_refresh}       = 1;
+		$sth->{ado_rownum}        = -1;
+		$sth->{ado_rows}          = -1;
+		$sth->{ado_rowset}        = undef;
+		$sth->{ado_type}          = undef;
+		$sth->{ado_usecmd}        = undef;
+		$sth->{ado_users}         = undef;
+		$sth->{ado_executeoption} = 0;
 
 		# Set overrides for and attributes.
 		for my $key ( grep { /^ado_/ } keys %$attr ) {
@@ -375,6 +376,17 @@
     if ( $sth->{ado_refresh} == 2 ) {
       $Cnt = DBD::ADO::st::_refresh( $sth );
     }
+	# LRB
+	if ( $sth->{ado_executeoption} && $sth->{ado_executeoption} == $Enums->{ExecuteOptionEnum}{adExecuteStream}) {
+		my $sResponseStream = Win32::OLE->new('ADODB.Stream');
+		return if DBD::ADO::Failed($dbh, "Can't create 'ADODB.Stream'");
+		$sResponseStream->Open();
+		return if DBD::ADO::Failed($dbh, "Can't open 'ADODB.Stream'");
+		my $vObj = Win32::OLE::Variant->new(Win32::OLE::Variant::VT_VARIANT()|Win32::OLE::Variant::VT_BYREF(), $sResponseStream);
+		return if DBD::ADO::Failed($dbh, "Can't create Variant for 'ADODB.Stream'");
+		$comm->{Properties}{'Output Stream'}{Value} = $vObj;
+		$sth->{ado_responsestream} = $sResponseStream;
+	}
     if ( $Cnt ) {
       # Describe the Parameters:
       for my $p ( Win32::OLE::in( $comm->Parameters ) ) {
@@ -780,6 +792,66 @@
 	}
 
 
+	sub statistics_info {
+		my ( $dbh, $catalog, $schema, $table, $unique_only, $quick ) = @_;
+		my $QueryType = 'adSchemaIndexes';
+		my $IndexType = {
+		  #    'table'
+		  1 => 'btree'
+		, 2 => 'hashed'
+		, 3 => 'content'
+		, 4 => 'other'
+		  #    'clustered'
+		};
+		my $Collation = {
+		  1 => 'A'
+		, 2 => 'D'
+		};
+		my @Rows;
+		my $conn = $dbh->{ado_conn};
+
+		my $rs = $conn->OpenSchema( $Enums->{SchemaEnum}{$QueryType}, [ $catalog, $schema, undef, undef, $table ] );
+		return if DBD::ADO::Failed( $dbh,"Can't OpenSchema ($QueryType)");
+
+		while ( !$rs->{EOF} ) {
+			my @Fields = (map { $_->{Value} } Win32::OLE::in( $rs->Fields ) ) [ 0..2,7,4..5,9,16,17,20..23,8 ];
+			$Fields[ 3]  = $Fields[ 3] ? 0 : 1;
+			$Fields[ 6]  = pop @Fields ? 'clustered' : defined $Fields[ 6] ? $IndexType->{$Fields[ 6]} : '';
+			$Fields[ 9]  = $Collation->{$Fields[ 9]};
+			$rs->MoveNext;
+			next if $unique_only && $Fields[ 3];
+			push @Rows, \@Fields;
+		}
+		$rs->Close;
+		@Rows = sort {
+		     $a->[3]       <=>   $b->[3]
+		||   $a->[6]       cmp   $b->[6]
+		|| ( $a->[4] ||'') cmp ( $b->[4] ||'')
+		||   $a->[5]       cmp   $b->[5]
+		||   $a->[7]       <=>   $b->[7]
+		} @Rows;
+		{
+		my $QueryType = 'adSchemaStatistics';
+		my $rs = $conn->OpenSchema( $Enums->{SchemaEnum}{$QueryType}, [ $catalog, $schema, $table ] );
+		return if DBD::ADO::Failed( $dbh,"Can't OpenSchema ($QueryType)");
+
+		while ( !$rs->{EOF} ) {
+			my @Fields = ( undef ) x 13;
+			@Fields[ 6, 0..2, 10] = ('table', map { $_->{Value} } Win32::OLE::in( $rs->Fields ) );
+			unshift @Rows, \@Fields;
+			$rs->MoveNext;
+		}
+		$rs->Close;
+		}
+
+		DBI->connect('dbi:Sponge:','','', { RaiseError => 1 } )->prepare(
+			$QueryType, { rows => \@Rows
+			, NAME => [ qw( TABLE_CAT TABLE_SCHEM TABLE_NAME NON_UNIQUE INDEX_QUALIFIER INDEX_NAME TYPE ORDINAL_POSITION COLUMN_NAME ASC_OR_DESC CARDINALITY PAGES FILTER_CONDITION ) ]
+			, TYPE => [            12,         12,        12,         5,             12,        12,  12,               5,         12,          1,          4,    4,              12   ]
+		} );
+	}
+
+
   sub type_info_all {
     my ( $dbh ) = @_;
     return $dbh->{ado_ti_ver} == 2
@@ -987,6 +1059,9 @@
     my $conn = $sth->{ado_conn};
     my $comm = $sth->{ado_comm};
 
+    $attr = {} unless defined $attr;
+    $attr = { TYPE => $attr } unless ref $attr;
+
     my $param_cnt = $sth->FETCH('NUM_OF_PARAMS') || _refresh( $sth );
 
     return $sth->set_err( -915,"Bind Parameter $n outside current range of $param_cnt.") if $n > $param_cnt || $n < 1;
@@ -995,32 +1070,24 @@
 
     my $i = $comm->Parameters->Item( $n - 1 );
 
-    if ( defined $attr ) {
-      if ( ref $attr ) {
-        if ( exists $attr->{ado_type} ) {
-          $i->{Type} = $attr->{ado_type};
-        }
-        elsif ( exists $attr->{TYPE} ) {
-          $i->{Type} = $DBD::ADO::TypeInfo::dbi2ado->{$attr->{TYPE}};
-        }
-      }
-      else {
-        $i->{Type} = $DBD::ADO::TypeInfo::dbi2ado->{$attr};
-      }
+    if ( exists $attr->{ado_type} ) {
+      $i->{Type} = $attr->{ado_type};
+    }
+    elsif ( exists $attr->{TYPE} ) {
+      $i->{Type} = $DBD::ADO::TypeInfo::dbi2ado->{$attr->{TYPE}};
     }
     if ( defined $value ) {
-      if ( $i->{Type} == $Enums->{DataTypeEnum}{adVarBinary} or
-           $i->{Type} == $Enums->{DataTypeEnum}{adLongVarBinary}
-      ) {
-        # Deal with an image request.
-        my $pic = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_UI1() | Win32::OLE::Variant::VT_ARRAY(), 10 + length $value );  # $i->{Size}
+      $i->{Size}  = defined $attr->{ado_size} ? $attr->{ado_size} : length $value;
+      if ( $i->{Type} == $Enums->{DataTypeEnum}{adVarBinary}
+        || $i->{Type} == $Enums->{DataTypeEnum}{adLongVarBinary}
+         ) {
+        my $pic = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_UI1() | Win32::OLE::Variant::VT_ARRAY(), $i->{Size} );
         $pic->Put( $value );
         $i->{Value} = $pic;
         $sth->trace_msg("    -- Binary: $i->{Type} $i->{Size}\n", 5 );
       }
       else {
-        $i->{Size}  = defined $attr->{ado_size} ? $attr->{ado_size} : length $value;
-        $i->{Value} = $value;         # $value if $value;
+        $i->{Value} = $value;
         $sth->trace_msg("    -- Type  : $i->{Type} $i->{Size}\n", 5 );
       }
     }
@@ -1051,8 +1118,16 @@
 			(  defined $sth->{ado_cursortype}
 			|| defined $sth->{ado_users}
 			);
+		my $UseResponseStream = $sth->{ado_executeoption} &&
+			( $sth->{ado_executeoption} == $Enums->{ExecuteOptionEnum}{adExecuteStream} );
 
-		if ( $UseRecordSet ) {
+		if ( $UseResponseStream ) {
+			$sth->trace_msg("    -- Execute: Using Response Stream\n", 5 );
+			$comm->Execute( { 'Options' => $sth->{ado_executeoption} } );
+			return if DBD::ADO::Failed( $sth,"Can't Execute Command '$sql'");
+			return $sth->{ado_responsestream}->ReadText();
+		}
+		elsif ( $UseRecordSet ) {
 			$rs = Win32::OLE->new('ADODB.RecordSet');
 			return if DBD::ADO::Failed( $sth,"Can't create 'ADODB.RecordSet'");
 
@@ -1533,6 +1608,14 @@ Accepts any of the attributes described in the L</table_info> method:
   @names = $dbh->tables( undef, undef, undef,'VIEW');
 
 
+=head2 statistics_info
+
+The row for TYPE 'table' is always the first row. Its PAGES field will be
+NULL (C<undef>).
+
+The C<$quick> argument is ignored.
+
+
 =head1 ADO-specific methods
 
 =head2 ado_open_schema
@@ -1709,6 +1792,7 @@ dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
   Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2004, Steffen Goeldner
   Copyright (c) 2005, Steffen Goeldner
+  Copyright (c) 2006, Steffen Goeldner
 
   All rights reserved.
 

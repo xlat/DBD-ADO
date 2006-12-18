@@ -1,7 +1,11 @@
 
-Remove global error variables
-
 Adjust return codes wrt the spec
+
+Implement bind_param_inout()
+(Can we impl. this w/o additional code in execute(), i.e.
+bind $bind_value to the ADO parameter?)
+
+Implement $sth->{ParamTypes}
 
 Add $dbh->last_insert_id
 
