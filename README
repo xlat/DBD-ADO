@@ -13,6 +13,13 @@ DESCRIPTION
   The DBD::ADO module supports ADO access on a Win32 machine. DBD::ADO is
   written to support the standard DBI interface to data sources.
 
+PREREQUISITES
+
+  DBI
+  Win32::OLE
+
+  ADO (http://www.microsoft.com/Data/download.htm)
+
 INSTALLATION
 
   To install this module type the following:
@@ -27,12 +34,37 @@ INSTALLATION
   If using the Win32 ActiveState build then it is recommended that you
   use the ppm utility to fetch and install the module instead.
 
-PREREQUISITES
+TESTING
 
-  DBI
-  Win32::OLE
+  The supplied tests will connect to the database using the DBI
+  environment variables, e.g.:
 
-  ADO (http://www.microsoft.com/Data/download.htm)
+    set DBI_DSN=dbi:ADO:File Name=test.udl
+    set DBI_DSN=dbi:ADO:Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\tmp\test.mdb
+
+  The tests will create tables (or other database objects) with the name
+  (or prefix) 'PERL_DBD_TEST' in the current schema.
+  Check for the unlikly case that this will cause unwanted side effects!
+
+  To run the tests, type
+
+    make test
+
+  If all tests pass, you'll see something like:
+
+    t\01base.......ok
+    t\02ads........ok
+    t\02cxn........ok
+    t\04os.........ok
+        25/45 skipped: various reasons
+    ...
+    t\51qi.........ok
+    All tests successful, 53 subtests skipped.
+    Files=29, Tests=737, 122 wallclock secs ...
+
+  It is possible to run individual test scripts, e.g.:
+
+    perl -w -Mblib t\02cxn.t
 
 AUTHORS
 
@@ -58,9 +90,7 @@ COPYRIGHT
   Copyright (c) 2001, Tim Bunce, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2002, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
-  Copyright (c) 2004, Steffen Goeldner
-  Copyright (c) 2005, Steffen Goeldner
-  Copyright (c) 2006, Steffen Goeldner
+  Copyright (c) 2004-2009 Steffen Goeldner
 
   All rights reserved.
 

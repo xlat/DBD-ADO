@@ -1,3 +1,9 @@
+2009-03-22  2.97
+
+  Added tests for bind_param_inout() (t/28sp.t).
+
+  Patch for supporting bind_param_inout() from Peter Mei.
+
 2006-12-17  2.96
 
   Implemented statistics_info().

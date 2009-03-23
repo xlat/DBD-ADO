@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh);
 
-  $VERSION = '2.96';
+  $VERSION = '2.97';
 
   $drh = undef;
 
@@ -1055,20 +1055,53 @@
 
 
   sub bind_param {
-    my ( $sth, $n, $value, $attr ) = @_;
+    # my ( $sth, $n, $value, $attr ) = @_;
+    # return _bind_param( $sth, $n, $value, $attr, FALSE, 0 )
+    return _bind_param( @_[0..3], 0, 0 );
+  }
+
+  sub bind_param_inout {
+    # my ( $sth, $n, $vref, $maxlen, $attr ) = @_;
+    # return _bind_param( $sth, $n, $vref, $attr, TRUE, $maxlen )
+    return _bind_param( @_[0..2, 4], 1, $_[3] );
+  }
+
+  sub _bind_param {
+    my ( $sth, $n, $value, $attr, $is_bind_by_ref, $maxlen ) = @_;
+
     my $conn = $sth->{ado_conn};
     my $comm = $sth->{ado_comm};
+    my $is_stored_procedure = $comm->{CommandType} == $Enums->{CommandTypeEnum}{adCmdStoredProc};
 
     $attr = {} unless defined $attr;
     $attr = { TYPE => $attr } unless ref $attr;
 
     my $param_cnt = $sth->FETCH('NUM_OF_PARAMS') || _refresh( $sth );
+    --$param_cnt if $is_stored_procedure;
 
     return $sth->set_err( -915,"Bind Parameter $n outside current range of $param_cnt.") if $n > $param_cnt || $n < 1;
 
-    $sth->{ParamValues}{$n} = $value;
+    if ( $is_bind_by_ref && defined $value ) {
+      return $sth->set_err( -930,"Bind target for OUT parameter $n must be a scalar reference.")
+        unless ref $value eq 'SCALAR';
+      if ( $sth->{TraceLevel} >= 5 ) {
+        $sth->trace_msg("    -- discard old binding for $n", 5 )
+          if exists $sth->{ado_ParamRefs}{$n};
+        $sth->trace_msg("    -- bind param $n by reference to '$$value'; maxlen=$maxlen; attr={"
+            . join(", ", map "$_ => $attr->{$_}", keys %$attr ) . "}\n", 5 );
+      }
+      $sth->{ado_ParamRefs}{$n} = $value;
+      $sth->{ado_ParamRefAttrs}{$n} = $attr;
+    }
+    else {  # delete even if not ref; might need to clobber an old ref.
+      $sth->trace_msg("    -- discard old binding for $n", 5 )
+        if exists $sth->{ado_ParamRefs}{$n};
+      delete $sth->{ado_ParamRefs}{$n};
+      delete $sth->{ado_ParamRefAttrs}{$n};
+    }
 
-    my $i = $comm->Parameters->Item( $n - 1 );
+    # support adCmdStoredProc command format, where param 0 is @RETURN_VALUE
+    my $i = $comm->Parameters->Item( $n - ( $is_stored_procedure ? 0 : 1 ) );
 
     if ( exists $attr->{ado_type} ) {
       $i->{Type} = $attr->{ado_type};
@@ -1076,27 +1109,72 @@
     elsif ( exists $attr->{TYPE} ) {
       $i->{Type} = $DBD::ADO::TypeInfo::dbi2ado->{$attr->{TYPE}};
     }
+
+    if ( $is_bind_by_ref ) {
+      $attr->{ado_maxlen} = $maxlen;
+    }
+    else {
+      # factored-out to support delayed binding
+      _assign_param( $sth, $n, $value, $attr, $i );
+    }
+    return 1;
+  }
+
+  sub _assign_param {
+    my ( $sth, $n, $value, $attr, $i ) = @_;
+
+    $i = $sth->{ado_comm}->Parameters->Item( int( $i ) -
+      ( $sth->{ado_comm}{CommandType} == $Enums->{CommandTypeEnum}{adCmdStoredProc} ? 0 : 1) )
+      unless defined $i;
+    $attr = {} unless defined $attr;
+
+    $sth->{ParamValues}{$n} = $value;
+
     if ( defined $value ) {
-      $i->{Size}  = defined $attr->{ado_size} ? $attr->{ado_size} : length $value;
+      if ( defined $attr->{ado_size} ) {
+        $i->{Size} = $attr->{ado_size};
+      }
+      elsif ( defined $attr->{ado_maxlen} && $attr->{ado_maxlen} > length $value ) {
+        $i->{Size} = $attr->{ado_maxlen};
+      }
+      else {
+        $i->{Size} = length $value;
+      }
       if ( $i->{Type} == $Enums->{DataTypeEnum}{adVarBinary}
         || $i->{Type} == $Enums->{DataTypeEnum}{adLongVarBinary}
          ) {
         my $pic = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_UI1() | Win32::OLE::Variant::VT_ARRAY(), $i->{Size} );
+        return $sth->set_err( -935, "Failed to create a Variant array of size $i->{Size}.")
+          unless defined $pic;
         $pic->Put( $value );
         $i->{Value} = $pic;
         $sth->trace_msg("    -- Binary: $i->{Type} $i->{Size}\n", 5 );
       }
       else {
         $i->{Value} = $value;
-        $sth->trace_msg("    -- Type  : $i->{Type} $i->{Size}\n", 5 );
+        $sth->trace_msg("    -- Type : $i->{Type} $i->{Size}\n", 5 );
       }
     }
     else {
       $i->{Value} = Win32::OLE::Variant->new( Win32::OLE::Variant::VT_NULL() );
     }
-    return 1;
   }
 
+  sub _retrieve_out_params {
+    my ( $sth ) = @_;
+    my $comm = $sth->{ado_comm};
+    my $is_stored_procedure = $comm->{CommandType} == $Enums->{CommandTypeEnum}{adCmdStoredProc};
+    while ( my ( $n, $vref ) = each %{$sth->{ado_ParamRefs}} ) {
+      my $value = $comm->Parameters->Item( $n - ( $is_stored_procedure ? 0 : 1 ) )->{Value};
+      # XXX perhaps should translate Variant null representation, here, first?
+      $sth->{ParamValues}{$n} = $$vref = $value;
+      $sth->trace_msg("    -- _retrieve_out_params : param => $n  value => '$value'\n", 5 );
+    }
+    if ($is_stored_procedure) {
+      $sth->{ado_returnvalue} = $comm->Parameters->Item( 0 )->{Value};
+      $sth->trace_msg("    -- _retrieve_out_params : param => RETURN_VALUE  value => '$sth->{ado_returnvalue}'\n", 5 );
+    }
+  }
 
 	sub execute {
 		my ( $sth, @bind_values ) = @_;
@@ -1110,6 +1188,18 @@
 
     $sth->bind_param( $_, $bind_values[$_-1] ) or return for 1 .. @bind_values;
 
+    ## delayed binding of by-ref input[/output] parameters
+    unless (@bind_values) {
+      while ( my ( $n, $vref ) = each %{$sth->{ado_ParamRefs}} ) {
+        my $i = $comm->Parameters->Item( $n - ($comm->{CommandType} == $Enums->{CommandTypeEnum}{adCmdStoredProc} ? 0 : 1) );
+        if ( $i->{Direction} & $Enums->{ParameterDirectionEnum}{adParamInput} ) {
+          # probably don't need the ternary; creation of ado_maxlen should
+          # guarantee that this will always exist
+          my $attr = defined $sth->{ado_ParamRefAttrs}{$n} ? $sth->{ado_ParamRefAttrs}{$n} : undef;
+          _assign_param( $sth, $n, $$vref, $attr, $i );
+        }
+      }
+    }
 		# At this point a Command is ready to Execute. To allow for different
 		# type of cursors, we need to create a Recordset object.
 		# However, a Recordset Open does not return affected rows. So we need to
@@ -1125,6 +1215,7 @@
 			$sth->trace_msg("    -- Execute: Using Response Stream\n", 5 );
 			$comm->Execute( { 'Options' => $sth->{ado_executeoption} } );
 			return if DBD::ADO::Failed( $sth,"Can't Execute Command '$sql'");
+      _retrieve_out_params( $sth );
 			return $sth->{ado_responsestream}->ReadText();
 		}
 		elsif ( $UseRecordSet ) {
@@ -1135,11 +1226,13 @@
 			$sth->trace_msg("    -- Open Recordset using CursorType '$CursorType'\n", 5 );
 			$rs->Open( $comm, undef, $Enums->{CursorTypeEnum}{$CursorType} );
 			return if DBD::ADO::Failed( $sth,"Can't Open Recordset for '$sql'");
+      _retrieve_out_params( $sth );
 			$sth->trace_msg("    -- CursorType: $rs->{CursorType}\n", 5 );
 		}
 		else {
 			$rs = $comm->Execute( $rows );
 			return if DBD::ADO::Failed( $sth,"Can't Execute Command '$sql'");
+      _retrieve_out_params( $sth );
 		}
     $rows = $rows->Value;  # to make a DBD::Proxy client w/o Win32::OLE happy
     my @Fields;
@@ -1497,6 +1590,28 @@ If no type is given (neither by the provider nor by you), the datatype
 defaults to SQL_VARCHAR (adVarChar).
 
 
+=head2 bind_param_inout
+
+This can be utilized (with IN parameters) to support simple
+call-by-reference, allowing for lazy parameter binding.
+
+  $sth->bind_param_inout( 1, \$value, 1024 );
+
+The contents of $value will not be dereferenced until the call to
+C<$sth-E<gt>execute();> is made.  To use IN/OUT parameter types with stored
+procedures, remember that you will need to specify the appropriate command
+type when preparing the statement, e.g.:
+
+  $sth = $dbh->prepare('sproc_name', { CommandType => 'adCmdStoredProc' } );
+
+After execution, all call-by-reference parameters will be updated with the
+parameter values reported by the ADO command object.
+
+For stored procedures, the parameter at index C<0> is treated as the
+return value of the procedure.  After execution, it is copied to the
+C<$sth-E<gt>{ado_returnvalue}> attribute.
+
+
 =head2 Type info
 
 There exists two implementations of type_info_all(). Which version is
@@ -1790,9 +1905,7 @@ dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
   Copyright (c) 2001, Tim Bunce, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2002, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
-  Copyright (c) 2004, Steffen Goeldner
-  Copyright (c) 2005, Steffen Goeldner
-  Copyright (c) 2006, Steffen Goeldner
+  Copyright (c) 2004-2009 Steffen Goeldner
 
   All rights reserved.
 

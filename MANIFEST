@@ -33,6 +33,7 @@ t/21sth.t
 t/23null.t
 t/25curs.t
 t/27lob.t
+t/28sp.t
 t/29timeout.t
 t/31txn.t
 t/41ddtbl.t
