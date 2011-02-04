@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh);
 
-  $VERSION = '2.97';
+  $VERSION = '2.98';
 
   $drh = undef;
 
@@ -24,6 +24,11 @@
     }
     $drh->STORE('LongReadLen', 2147483647 );
     return $drh;
+  }
+
+
+  sub CLONE {
+    undef $drh;
   }
 
 
@@ -1138,7 +1143,7 @@
         $i->{Size} = $attr->{ado_maxlen};
       }
       else {
-        $i->{Size} = length $value;
+        $i->{Size} = length $value || 1;
       }
       if ( $i->{Type} == $Enums->{DataTypeEnum}{adVarBinary}
         || $i->{Type} == $Enums->{DataTypeEnum}{adLongVarBinary}
@@ -1905,7 +1910,7 @@ dbi-users@perl.org and CC them to me (sgoeldner@cpan.org).
   Copyright (c) 2001, Tim Bunce, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2002, Thomas Lowery, Steffen Goeldner
   Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
-  Copyright (c) 2004-2009 Steffen Goeldner
+  Copyright (c) 2004-2011 Steffen Goeldner
 
   All rights reserved.
 

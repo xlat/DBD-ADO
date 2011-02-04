@@ -1,3 +1,15 @@
+2011-02-04  2.98
+
+  Fixed a 'Missing argument in sprintf at DBD/ADO/GetInfo.pm line 13.
+
+  Patch for supporting cygwin in Makefile.PL from Rafael Kitover.
+
+  Added a workaround for ADO Providers that don't accept a parameter size 0,
+  spotted by Jeff Picklyk.
+  Added test (12bind.t).
+
+  Added the CLONE special subroutine, spotted by Jeff Picklyk.
+
 2009-03-22  2.97
 
   Added tests for bind_param_inout() (t/28sp.t).

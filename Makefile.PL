@@ -38,7 +38,7 @@ GetOptions('g!') or die 'Invalid arguments';
 $opts{OPTIMIZE} = '-g -O0' if $::opt_g;
 
 die "Currently DBD::ADO only works on Win32 machines!\n"
-  if $^O !~ /win32/i && $ENV{USER} !~ /tlowery/i;
+  if $^O !~ /win32|cygwin/i && $ENV{USER} !~ /tlowery/i;
 
 print <<'TEXT';
 

@@ -10,7 +10,7 @@ use DBD_TEST();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 6;
+  plan tests => 7;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -31,6 +31,8 @@ my $data =
 ok( tab_insert( $dbh, $data ),'Insert test data');
 
 ok( tab_select( $dbh ),'Select test data');
+
+ok( $dbh->do("SELECT * FROM $DBD_TEST::table_name WHERE b = ?", {}, ''),'Bind empty string');
 
 ok( DBD_TEST::tab_delete( $dbh ),'Drop test table');
 
