@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh);
 
-  $VERSION = '2.98';
+  $VERSION = '2.99';
 
   $drh = undef;
 
@@ -224,8 +224,9 @@
 
     if ( defined $conn ) {
       local $Win32::OLE::Warn = 0;
-      $dbh->trace_msg('    -- State: ' . $conn->State . "\n", 5 );
-      if ( $conn->State & $Enums->{ObjectStateEnum}{adStateOpen} ) {
+      my $State = $conn->State || 0;
+      $dbh->trace_msg("    -- State: $State\n", 5 );
+      if ( $State & $Enums->{ObjectStateEnum}{adStateOpen} ) {
         # Change the connection attribute so Commit/Rollback
         # does not start another transaction.
         $conn->{Attributes} = 0;
@@ -409,14 +410,16 @@
 
 	# Creates a Statement handle from a row set.
 	sub _rs_sth_prepare {
-		my ( $dbh, $rs ) = @_;
+		my ( $dbh, $rs, $sth1 ) = @_;
 
 		$dbh->trace_msg("    -> _rs_sth_prepare: Create statement handle from RecordSet\n", 3 );
 
 		my $conn = $dbh->{ado_conn};
 		my @Fields = Win32::OLE::in( $rs->Fields );
 
-		my ( $outer, $sth ) = DBI::_new_sth( $dbh, { Statement => $rs->Source } );
+		my ( $outer, $sth ) = $sth1
+                        ? ( undef, $sth1 )
+                        : DBI::_new_sth( $dbh, { Statement => $rs->Source } );
 
 		$sth->{ado_comm}       = $conn;  # XXX
 		$sth->{ado_conn}       = $conn;
@@ -492,9 +495,6 @@
     $attr->{ado_columns}      = $attr->{ADO_Columns}  if exists $attr->{ADO_Columns}  && !exists $attr->{ado_columns};
     $attr->{ado_filter}       = $attr->{Filter}       if exists $attr->{Filter}       && !exists $attr->{ado_filter};
     $attr->{ado_trim_catalog} = $attr->{Trim_Catalog} if exists $attr->{Trim_Catalog} && !exists $attr->{ado_trim_catalog};
-
-		my $tmpCursorLocation = $conn->{CursorLocation};
-		$conn->{CursorLocation} = $Enums->{CursorLocationEnum}{adUseClient};
 
 		my $field_names = $attr->{ado_columns}
 			?  $ado_schematables : $ado_dbi_schematables;
@@ -643,7 +643,6 @@
 
 		$rs->Close if $rs;
 		$rs = undef;
-		$conn->{CursorLocation} = $tmpCursorLocation;
 
 		DBI->connect('dbi:Sponge:','','', { RaiseError => 1 } )->prepare(
 			'adSchemaTables', { rows => \@Rows
@@ -988,6 +987,12 @@
 
   sub DESTROY {
     my ( $dbh ) = @_;
+
+    my $warn_handler = $SIG{__WARN__} || sub { warn @_ };
+    local $SIG{__WARN__} = sub {
+      $warn_handler->(@_) unless $_[0] =~ /Not a Win32::OLE object/
+    };
+
     $dbh->disconnect if $dbh->FETCH('Active');
     return;
   }
@@ -1291,6 +1296,21 @@
   }
 
 
+  sub more_results {
+    my ( $sth ) = @_;
+
+    my $rs = $sth->{ado_rowset}->NextRecordset;
+    return if DBD::ADO::Failed( $sth,"Can't NextRecordset");
+
+    return undef unless $rs;
+
+    delete $sth->{NUM_OF_FIELDS};
+    DBD::ADO::db::_rs_sth_prepare( $sth, $rs, $sth );
+
+    return 1;
+  }
+
+
   sub rows {
     my ( $sth ) = @_;
 
@@ -1311,7 +1331,7 @@
       $rs->MoveNext;
       return if DBD::ADO::Failed( $sth,"Can't MoveNext");
     }
-    $sth->finish, return if $rs->{EOF};
+    $sth->STORE('Active', 0 ), return if $rs->{EOF};
 
     my @row;
     if ( $sth->{ado_has_lob} && $sth->FETCH('LongReadLen') < 2147483647 ) {

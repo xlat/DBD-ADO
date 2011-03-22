@@ -15,6 +15,7 @@ our %info =
 ,    28 => \&sql_identifier_case          # SQL_IDENTIFIER_CASE
 ,    29 => \&sql_identifier_quote_char    # SQL_IDENTIFIER_QUOTE_CHAR
 ,    89 => \&sql_keywords                 # SQL_KEYWORDS
+,    36 => \&sql_mult_result_sets         # SQL_MULT_RESULT_SETS
 );
 
 our %odbc2ado =
@@ -66,6 +67,10 @@ sub sql_keywords
     push @Keywords, $row->[0];
   }
   return join ',', @Keywords;
+}
+sub sql_mult_result_sets
+{
+  $_[0]->{ado_conn}->Properties->{'Multiple Results'}{Value} ? 'Y':'N';
 }
 
 1;

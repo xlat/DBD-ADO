@@ -1,6 +1,16 @@
+2011-03-22  2.99
+
+  Patch to remove annoying warnings during global destruction,
+  with tests, from Rafael Kitover.
+
+  Implemented more_results().
+  Added tests (t/26more.t).
+
+  Small change to table_info(): no need for client-side cursors.
+
 2011-02-04  2.98
 
-  Fixed a 'Missing argument in sprintf at DBD/ADO/GetInfo.pm line 13.
+  Fixed a 'Missing argument in sprintf at DBD/ADO/GetInfo.pm line 13'.
 
   Patch for supporting cygwin in Makefile.PL from Rafael Kitover.
 

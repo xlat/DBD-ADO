@@ -10,7 +10,7 @@ use DBD_TEST();
 use Test::More;
 
 if (defined $ENV{DBI_DSN}) {
-  plan tests => 26;
+  plan tests => 27;
 } else {
   plan skip_all => 'Cannot test without DB info';
 }
@@ -27,9 +27,12 @@ ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
   my @names = qw(TABLE_CAT TABLE_SCHEM TABLE_NAME TABLE_TYPE REMARKS);
   my $sth = $dbh->table_info;
   my $rows = 0;
+  my $found = 0;
   while ( my $row = $sth->fetch ) {
     $rows++;
+    $found++ if uc $row->[2] eq $tbl && $row->[3] eq 'TABLE';
   }
+  ok( $found,"Found TABLE $tbl");
   my $names = $sth->{NAME};
   is( $names->[$_], $names[$_],"Column: $names->[$_] $names[$_]")
     for 0 .. $#names;
@@ -58,45 +61,6 @@ ok( DBD_TEST::tab_create( $dbh ),"CREATE TABLE $tbl");
   my $row = $sth->fetch;
   ok( !defined $row,"$tbl isn't a VIEW!");
 }
-=for todo
-{
-  my $sth = $dbh->table_info('%');
-  ok( defined $sth,'Statement handle defined');
-
-  print "Catalogs:\n";
-  while ( my $row = $sth->fetch )
-  {
-    local $^W = 0;
-    local $,  = "\t";
-    print @$row,"\n";
-  }
-}
-{
-  my $sth = $dbh->table_info( undef,'%');
-  ok( defined $sth,'Statement handle defined');
-
-  print "Schemata:\n";
-  while ( my $row = $sth->fetch )
-  {
-    local $^W = 0;
-    local $,  = "\t";
-    print @$row,"\n";
-  }
-}
-{
-  my $sth = $dbh->table_info( undef, undef, undef,'%');
-  ok( defined $sth,'Statement handle defined');
-
-  print "Table types:\n";
-  while ( my $row = $sth->fetch )
-  {
-    local $^W = 0;
-    local $,  = "\t";
-    print @$row,"\n";
-  }
-}
-=cut
-
 # -----------------------------------------------------------------------------
 {
 my $sth;
