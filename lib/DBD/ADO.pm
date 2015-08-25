@@ -6,10 +6,11 @@
   use Win32::OLE();
   use vars qw($VERSION $drh);
 
-  $VERSION = '2.99';
+  $VERSION = '2.99.1';
 
   $drh = undef;
 
+  our $ForceBindParmSize = 2**31;
 
   sub driver {
     return $drh if $drh;
@@ -1139,7 +1140,7 @@
     $attr = {} unless defined $attr;
 
     $sth->{ParamValues}{$n} = $value;
-
+    
     if ( defined $value ) {
       if ( defined $attr->{ado_size} ) {
         $i->{Size} = $attr->{ado_size};
@@ -1148,8 +1149,8 @@
         $i->{Size} = $attr->{ado_maxlen};
       }
       else {
-        $i->{Size} = length $value || 1;
-      }
+		$i->{Size} = $DBD::ADO::ForceBindParmSize || length $value || 1;
+	}
       if ( $i->{Type} == $Enums->{DataTypeEnum}{adVarBinary}
         || $i->{Type} == $Enums->{DataTypeEnum}{adLongVarBinary}
          ) {

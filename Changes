@@ -1,3 +1,6 @@
+2011-03-22  2.99.1
+  Hack to force bind_param to always use a specific value length.
+
 2011-03-22  2.99
 
   Patch to remove annoying warnings during global destruction,
