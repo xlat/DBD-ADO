@@ -1301,7 +1301,10 @@
     my ( $sth ) = @_;
 
     my $rs = $sth->{ado_rowset}->NextRecordset;
-    return if DBD::ADO::Failed( $sth,"Can't NextRecordset");
+    my $err = DBD::ADO::Failed( $sth,"Can't NextRecordset");
+    
+    $DB::single = 1 if $err;
+    return if $err && $sth->state ne '01000'; #allow next results  even with some errors/warnings
 
     return undef unless $rs;
 

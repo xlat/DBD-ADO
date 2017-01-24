@@ -1,4 +1,10 @@
-2011-03-22  2.99.1
+
+2017-01-24 2.99.2
+
+  Patch to allow more_results on a stored procedure.
+
+2015-08-25  2.99.1
+
   Hack to force bind_param to always use a specific value length.
 
 2011-03-22  2.99
