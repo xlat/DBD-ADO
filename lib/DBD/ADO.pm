@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh);
 
-  $VERSION = '2.99.1';
+  $VERSION = '2.99.2';
 
   $drh = undef;
 
