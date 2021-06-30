@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBD-ADO
-version:            2.99.2
+version:            2.99.3
 abstract:           ADO driver for the DBI module.
 author:
     - Tim Bunce, Phlip, Thomas Lowery and Steffen Goeldner ( http://dbi.perl.org )

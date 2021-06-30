@@ -20,5 +20,5 @@ no_index:
 requires:
   DBI: '0'
   Win32::OLE: '0.16'
-version: 2.99.2
+version: 2.99.3
 x_serialization_backend: 'CPAN::Meta::YAML version 0.012'

@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh);
 
-  $VERSION = '2.99.2';
+  $VERSION = '2.99.3';
 
   $drh = undef;
 
@@ -1310,9 +1310,12 @@
     my ( $sth ) = @_;
 
     my $rs = $sth->{ado_rowset}->NextRecordset;
-    return if DBD::ADO::Failed( $sth,"Can't NextRecordset");
+    my $err = DBD::ADO::Failed( $sth,"Can't NextRecordset");
 
-    return undef unless $rs;
+    #~ $DB::single = 1 if $err;
+    return if $err && $sth->state ne '01000'; #allow next results  even with some errors/warnings
+
+    return undef unless $rs and $rs->State;
 
     delete $sth->{NUM_OF_FIELDS};
     DBD::ADO::db::_rs_sth_prepare( $sth, $rs, $sth );
