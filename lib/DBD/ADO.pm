@@ -6,7 +6,7 @@
   use Win32::OLE();
   use vars qw($VERSION $drh);
 
-  $VERSION = '2.99.1';
+  $VERSION = '2.99.2';
 
   $drh = undef;
 
@@ -1083,6 +1083,15 @@
     my $conn = $sth->{ado_conn};
     my $comm = $sth->{ado_comm};
     my $is_stored_procedure = $comm->{CommandType} == $Enums->{CommandTypeEnum}{adCmdStoredProc};
+
+    if(ref $value eq 'ARRAY') {
+      ($value, $attr) = @$value;
+      $attr //= {};
+      if(defined $value && !exists $attr->{ado_size}){
+        $value = "$value";
+        $attr->{ado_size} = length $value;
+      }
+    }
 
     $attr = {} unless defined $attr;
     $attr = { TYPE => $attr } unless ref $attr;

@@ -1,0 +1,24 @@
+---
+abstract: 'ADO driver for the DBI module.'
+author:
+  - 'Tim Bunce, Phlip, Thomas Lowery and Steffen Goeldner ( http://dbi.perl.org )'
+build_requires:
+  ExtUtils::MakeMaker: '0'
+configure_requires:
+  ExtUtils::MakeMaker: '0'
+dynamic_config: 0
+generated_by: 'ExtUtils::MakeMaker version 6.56, CPAN::Meta::Converter version 2.150010'
+license: unknown
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: '1.4'
+name: DBD-ADO
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  DBI: '0'
+  Win32::OLE: '0.16'
+version: 2.99.2
+x_serialization_backend: 'CPAN::Meta::YAML version 0.012'
